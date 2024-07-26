@@ -13,7 +13,7 @@ opencv_dep = dependency(
 src_files = ['src/rtmp.cpp']
 include_dirs = include_directories(['include/'])
 
-library(
+shared_library(
   'DynRT',
   sources: src_files,
   dependencies: [gstreamer_dep, opencv_dep],
