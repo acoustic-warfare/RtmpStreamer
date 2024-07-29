@@ -9,7 +9,7 @@ project(
 # Define directories
 include_dirs = include_directories('include', '/usr/include')
 src_dir = 'src'
-bindings_dir = 'bindings/src'
+bindings_dir = 'bindings/'
 
 # Source files
 cpp_files = files(join_paths(src_dir, 'rtmp.cpp'))
