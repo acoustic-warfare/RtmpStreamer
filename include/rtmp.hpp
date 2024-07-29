@@ -1,12 +1,13 @@
 #include <gst/app/gstappsrc.h>
 #include <gst/gst.h>
 
+#include <cstdint>
 #include <mutex>
 #include <opencv2/core/mat.hpp>
 #include <opencv2/opencv.hpp>
 
 class RtmpStreamer {
-public:
+   public:
     GstBus *bus;
 
     RtmpStreamer();
@@ -16,6 +17,7 @@ public:
     ~RtmpStreamer();
 
     bool send_frame(cv::Mat frame);
+    bool send_frame(uint8_t *frame, size_t size);
 
     void start_stream();
     void stop_stream();
@@ -29,18 +31,20 @@ public:
     void async_streamer_control_unit();
     void debug_info();
 
-private:
+   private:
     static void cb_need_data(GstAppSrc *appsrc, guint size, gpointer user_data);
     static void cb_enough_data(GstAppSrc *appsrc, gpointer user_data);
 
     bool connect_sink_bin_to_source_bin(GstElement *source_bin,
-                                        GstElement *sink_bin, GstPad **request_pad,
+                                        GstElement *sink_bin,
+                                        GstPad **request_pad,
                                         const char *tee_element_name,
                                         const char *tee_ghost_pad_name);
     bool disconnect_sink_bin_from_source_bin(
-            GstElement *source_bin, GstElement *sink_bin, GstPad *tee_pad,
-            const char *tee_ghost_pad_src_name);
+        GstElement *source_bin, GstElement *sink_bin, GstPad *tee_pad,
+        const char *tee_ghost_pad_src_name);
 
+    bool send_frame_to_appsrc(void *data, size_t size);
 
     gboolean check_links();
     void initialize_streamer();
@@ -49,7 +53,6 @@ private:
     gchar *source_bin_name, *rtmp_bin_name, *local_video_bin_name;
     GstElement *appsrc;
     GstPad *src_rtmp_tee_pad, *src_local_tee_pad;
-
 
     bool want_data;
     uint screen_width, screen_height;
