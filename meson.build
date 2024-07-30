@@ -36,7 +36,7 @@ py = import('python').find_installation()
 py_dep = py.dependency()
 
 # Cython compiler options
-cython_args = ['-Xboundscheck=False', '-std=c++17']
+cython_args = ['-Xboundscheck=False']
 
 cython_extension = py.extension_module(
   'rtmp_streamer',
@@ -46,6 +46,7 @@ cython_extension = py.extension_module(
   cython_args: cython_args,
   link_with: libdynrt,
   override_options: ['cython_language=cpp'], # Ensure C++ standard is consistent
+  cpp_args: ['-std=c++17'], # Ensure C++17 standard is used
   install: true,
 )
 
