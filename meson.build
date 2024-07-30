@@ -46,7 +46,6 @@ cython_extension = py.extension_module(
   cython_args: cython_args,
   link_with: libdynrt,
   override_options: ['cython_language=cpp'], # Ensure C++ standard is consistent
-  cpp_args: ['-std=c++17'],
   install: true,
 )
 
