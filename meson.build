@@ -35,15 +35,14 @@ libdynrt = library(
 py = import('python').find_installation()
 py_dep = py.dependency()
 
-_numpy_abs = run_command(
+npy_include_path = run_command(
   py,
   [
-    '-c', 'import os; os.chdir(".."); import numpy; print(os.path.abspath(numpy.get_include() + "../../.."))',
+    '-c', 'import os; os.chdir(".."); import numpy; print(os.path.abspath(numpy.get_include()))',
   ],
   check: true,
 ).stdout().strip()
 
-npy_include_path = _numpy_abs / 'core' / 'include'
 # Cython compiler options
 cython_args = ['-Xboundscheck=False']
 
@@ -56,7 +55,10 @@ cython_extension = py.extension_module(
   cython_args: cython_args,
   link_with: libdynrt,
   override_options: ['cython_language=cpp'], # Ensure to compile cython to c++
-  cpp_args: ['-std=c++17'], # Ensure C++17 standard is used
+  cpp_args: [
+    '-std=c++17',
+    '-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION',
+  ], # Ensure C++17 standard is used
   install: true,
 )
 
