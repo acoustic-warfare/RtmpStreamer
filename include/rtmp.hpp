@@ -10,6 +10,19 @@ class RtmpStreamer {
    public:
     GstBus *bus;
 
+    /**
+     * @brief Default constructor for the RtmpStreamer class.
+     *
+     * The `RtmpStreamer` constructor initializes the streamer with default
+     * screen dimensions and sets the `want_data` flag to `false`. It then calls
+     * `initialize_streamer` to set up the GStreamer pipeline and elements.
+     *
+     * - Sets the screen width to 1024 pixels.
+     * - Sets the screen height to 1024 pixels.
+     * - Initializes the `want_data` flag to `false`.
+     * - Calls the `initialize_streamer` function to configure the streaming
+     * pipeline.
+     */
     RtmpStreamer();
     RtmpStreamer(uint width, uint height);
     RtmpStreamer(const RtmpStreamer &) = delete;
@@ -28,11 +41,62 @@ class RtmpStreamer {
     void stop_local_stream();
 
     [[nodiscard]] bool check_error() const;
+
+    /**
+     * @brief Provides a command-line interface for controlling the RTMP and
+     * local streams.
+     *
+     * The `async_streamer_control_unit` function continuously reads commands
+     * from the standard input and executes the corresponding streamer control
+     * functions based on the input.
+     *
+     * Supported commands:
+     * - `stop_stream`        : Stops the whole stream.
+     * - `start_stream`       : Stops the whole stream.
+     * - `stop_rtmp_stream`   : Stops the RTMP stream.
+     * - `stop_local_stream`  : Stops the local stream.
+     * - `start_rtmp_stream`  : Starts the RTMP stream.
+     * - `start_local_stream` : Starts the local stream.
+     * - `quit`               : Exits the command loop.
+     *
+     * If an invalid command is entered, an error message is printed to the
+     * standard error. The command loop will continue to process commands until
+     * the "quit" command is received.
+     */
     void async_streamer_control_unit();
     void debug_info();
 
    private:
+    /**
+     * @brief Callback function that sets the flag indicating that data is
+     * needed.
+     *
+     * The `cb_need_data` function is a static callback used by the GStreamer
+     * `appsrc` element. It is called when the pipeline needs more data. The
+     * function sets the `want_data` flag to `true` to indicate that the
+     * application should provide more data.
+     *
+     * @param appsrc The GStreamer appsrc element requesting data.
+     * @param size The size of the data needed.
+     * @param user_data A pointer to user data; in this case, a boolean flag
+     * indicating the need for data.
+     */
     static void cb_need_data(GstAppSrc *appsrc, guint size, gpointer user_data);
+
+    /**
+     * @brief Callback function that resets the flag indicating that no more
+     * data is needed.
+     *
+     * The `cb_enough_data` function is a static callback used by the GStreamer
+     * `appsrc` element. It is called when the pipeline has enough data. The
+     * function sets the `want_data` flag to `false` to indicate that the
+     * application should stop providing data.
+     *
+     * @param appsrc The GStreamer appsrc element indicating no more data is
+     * needed.
+     * @param user_data A pointer to user data; in this case, a boolean flag
+     * indicating the need for data.
+     */
     static void cb_enough_data(GstAppSrc *appsrc, gpointer user_data);
 
     bool connect_sink_bin_to_source_bin(GstElement *source_bin,

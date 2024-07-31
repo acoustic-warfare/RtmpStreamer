@@ -35,14 +35,24 @@ libdynrt = library(
 py = import('python').find_installation()
 py_dep = py.dependency()
 
+_numpy_abs = run_command(
+  py,
+  [
+    '-c', 'import os; os.chdir(".."); import numpy; print(os.path.abspath(numpy.get_include() + "../../.."))',
+  ],
+  check: true,
+).stdout().strip()
+
+npy_include_path = _numpy_abs / 'core' / 'include'
 # Cython compiler options
 cython_args = ['-Xboundscheck=False']
 
+cython_include_dirs = include_directories('include', npy_include_path)
 cython_extension = py.extension_module(
   'rtmp_streamer',
   sources: pyx_files,
   dependencies: [opencv_dep, py_dep, gst_app_dep, gstreamer_dep],
-  include_directories: include_dirs,
+  include_directories: cython_include_dirs,
   cython_args: cython_args,
   link_with: libdynrt,
   override_options: ['cython_language=cpp'], # Ensure to compile cython to c++

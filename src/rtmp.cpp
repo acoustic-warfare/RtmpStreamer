@@ -10,27 +10,6 @@
 std::mutex RtmpStreamer::want_data_muxex = std::mutex();
 std::mutex RtmpStreamer::handling_pipeline = std::mutex();
 
-/**
- * @brief Provides a command-line interface for controlling the RTMP and local
- * streams.
- *
- * The `async_streamer_control_unit` function continuously reads commands from
- * the standard input and executes the corresponding streamer control functions
- * based on the input.
- *
- * Supported commands:
- * - `stop_stream`        : Stops the whole stream.
- * - `start_stream`       : Stops the whole stream.
- * - `stop_rtmp_stream`   : Stops the RTMP stream.
- * - `stop_local_stream`  : Stops the local stream.
- * - `start_rtmp_stream`  : Starts the RTMP stream.
- * - `start_local_stream` : Starts the local stream.
- * - `quit`               : Exits the command loop.
- *
- * If an invalid command is entered, an error message is printed to the standard
- * error. The command loop will continue to process commands until the "quit"
- * command is received.
- */
 void RtmpStreamer::async_streamer_control_unit() {
     std::string command;
     std::getline(std::cin, command);
@@ -52,19 +31,6 @@ void RtmpStreamer::async_streamer_control_unit() {
     } while (std::getline(std::cin, command));
 }
 
-/**
- * @brief Callback function that sets the flag indicating that data is needed.
- *
- * The `cb_need_data` function is a static callback used by the GStreamer
- * `appsrc` element. It is called when the pipeline needs more data. The
- * function sets the `want_data` flag to `true` to indicate that the application
- * should provide more data.
- *
- * @param appsrc The GStreamer appsrc element requesting data.
- * @param size The size of the data needed.
- * @param user_data A pointer to user data; in this case, a boolean flag
- * indicating the need for data.
- */
 void RtmpStreamer::cb_need_data(GstAppSrc *appsrc, guint size,
                                 gpointer user_data) {
     std::lock_guard<std::mutex> guard(want_data_muxex);
@@ -72,88 +38,28 @@ void RtmpStreamer::cb_need_data(GstAppSrc *appsrc, guint size,
     *want_data = true;
 }
 
-/**
- * @brief Callback function that resets the flag indicating that no more data is
- * needed.
- *
- * The `cb_enough_data` function is a static callback used by the GStreamer
- * `appsrc` element. It is called when the pipeline has enough data. The
- * function sets the `want_data` flag to `false` to indicate that the
- * application should stop providing data.
- *
- * @param appsrc The GStreamer appsrc element indicating no more data is needed.
- * @param user_data A pointer to user data; in this case, a boolean flag
- * indicating the need for data.
- */
 void RtmpStreamer::cb_enough_data(GstAppSrc *appsrc, gpointer user_data) {
     std::lock_guard<std::mutex> guard(want_data_muxex);
     bool *want_data = (bool *)user_data;
     *want_data = false;
 }
 
-/**
- * @brief Default constructor for the RtmpStreamer class.
- *
- * The `RtmpStreamer` constructor initializes the streamer with default screen
- * dimensions and sets the `want_data` flag to `false`. It then calls
- * `initialize_streamer` to set up the GStreamer pipeline and elements.
- *
- * - Sets the screen width to 1024 pixels.
- * - Sets the screen height to 1024 pixels.
- * - Initializes the `want_data` flag to `false`.
- * - Calls the `initialize_streamer` function to configure the streaming
- * pipeline.
- */
 RtmpStreamer::RtmpStreamer()
     : screen_width(1024), screen_height(1024), want_data(false) {
     initialize_streamer();
 }
 
-/**
- * @brief Parameterized constructor for the RtmpStreamer class.
- *
- * The `RtmpStreamer` constructor initializes the streamer with specified screen
- * dimensions and sets the `want_data` flag to `false`. It then calls
- * `initialize_streamer` to set up the GStreamer pipeline and elements.
- *
- * @param width The desired screen width in pixels.
- * @param height The desired screen height in pixels.
- *
- * - Sets the screen width to the provided `width` value.
- * - Sets the screen height to the provided `height` value.
- * - Initializes the `want_data` flag to `false`.
- * - Calls the `initialize_streamer` function to configure the streaming
- * pipeline.
- */
 RtmpStreamer::RtmpStreamer(uint width, uint height)
     : screen_width(width), screen_height(height), want_data(false) {
     initialize_streamer();
 }
 
-/**
- * @brief Destructor for the RtmpStreamer class.
- *
- * The `~RtmpStreamer` destructor cleans up the GStreamer pipeline and releases
- * resources. It sets the pipeline state to `GST_STATE_NULL` to stop any ongoing
- * streaming and unrefs the pipeline object to free allocated memory.
- */
 RtmpStreamer::~RtmpStreamer() {
     g_print("set to null.\n");
     gst_element_set_state(pipeline, GST_STATE_NULL);
     gst_object_unref(pipeline);
 }
 
-/**
- * @brief Starts the streaming pipeline and prepares the appsrc element.
- *
- * The `start_stream` function initializes the `appsrc` element, sets up signal
- * connections for data handling, and transitions the pipeline to the
- * `GST_STATE_PLAYING` state to start streaming.
- *
- * Edge Cases:
- * - If the `appsrc` element cannot be retrieved from `source_bin`, an error
- * message is printed and the program exits.
- */
 void RtmpStreamer::start_stream() {
     appsrc = gst_bin_get_by_name(GST_BIN(source_bin), "appsrc");
     if (!appsrc) {
@@ -167,13 +73,6 @@ void RtmpStreamer::start_stream() {
     bus = gst_element_get_bus(pipeline);
 }
 
-/**
- * @brief Stops the streaming pipeline.
- *
- * The `stop_stream` function sets the state of the pipeline to
- * `GST_STATE_NULL`, which stops the streaming process and releases the
- * resources used by the pipeline.
- */
 void RtmpStreamer::stop_stream() {
     gst_element_set_state(pipeline, GST_STATE_NULL);
 }
@@ -282,23 +181,6 @@ bool RtmpStreamer::send_frame(cv::Mat frame) {
     }
 }
 
-/* @brief Sets up the GStreamer pipeline and its elements for streaming.
- *
- * The `initialize_streamer` function configures the GStreamer pipeline with
- * necessary bins and elements, and links them to enable streaming. It creates
- * and sets up:
- * - A source bin with `appsrc`, video conversion, scaling, and tee elements.
- * - An RTMP bin with encoding, muxing, and RTMP sink elements.
- * - A local video bin with a queue and video sink element.
- *
- * Edge Cases:
- * - If any element creation or bin setup fails, an error message is printed and
- * the program exits.
- * - If the `tee` element cannot be retrieved, an error message is printed and
- * the program exits.
- * - If linking pads between elements fails, an error message is printed and the
- * program exits.
- */
 void RtmpStreamer::initialize_streamer() {
     gst_init(nullptr, nullptr);
 
@@ -392,22 +274,7 @@ void RtmpStreamer::initialize_streamer() {
     gst_object_unref(local_video_sink_pad);
 }
 
-/**
- * @brief Sets the state of a GStreamer element to match its parent's state.
- *
- * The `set_element_state_to_parent_state` function retrieves the state of the
- * parent element and applies that state to the specified element. This ensures
- * that the element's state aligns with the parent element's state, facilitating
- * consistent pipeline behavior.
- *
- * @param element The GStreamer element whose state is to be set.
- *
- * Edge Cases:
- * - If the `element` is `NULL`, an error message is printed.
- * - If the `element` has no parent, an error message is printed.
- * - If retrieving the parent's state fails, an error message is printed.
- * - If setting the element's state fails, an error message is printed.
- */
+
 static void set_element_state_to_parent_state(GstElement *element) {
     GstElement *parent;
     GstState parent_state, parent_pending;
@@ -446,19 +313,7 @@ static void set_element_state_to_parent_state(GstElement *element) {
     gst_object_unref(parent);
 }
 
-/**
- * @brief Starts the RTMP streaming by connecting the RTMP bin to the source
- * bin.
- *
- * The `start_rtmp_stream` function checks if the RTMP bin is already connected
- * to the pipeline. If not, it connects the RTMP bin to the source bin using the
- * `connect_sink_bin_to_source_bin` method.
- *
- * Edge Cases:
- * - If the RTMP bin is already connected, a message is printed and the function
- * returns without making changes.
- * - If connecting the RTMP bin to the source bin fails, the program exits.
- */
+
 void RtmpStreamer::start_rtmp_stream() {
     GstElement *bin = gst_bin_get_by_name(GST_BIN(pipeline), rtmp_bin_name);
     if (bin) {
@@ -473,21 +328,7 @@ void RtmpStreamer::start_rtmp_stream() {
     }
 }
 
-/**
- * @brief Stops the RTMP streaming by disconnecting the RTMP bin from the source
- * bin.
- *
- * The `stop_rtmp_stream` function checks if the RTMP bin is connected to the
- * pipeline. If it is, the function disconnects the RTMP bin from the source bin
- * and updates internal state.
- *
- * Edge Cases:
- * - If the RTMP bin is already disconnected, a message is printed and the
- * function returns without making changes.
- * - If disconnecting the RTMP bin from the source bin fails, the program exits.
- * - The `src_rtmp_tee_pad` is set to `nullptr` after disconnection to avoid
- * dangling pointers.
- */
+
 void RtmpStreamer::stop_rtmp_stream() {
     GstElement *bin = gst_bin_get_by_name(GST_BIN(pipeline), rtmp_bin_name);
     if (!bin) {
@@ -502,20 +343,7 @@ void RtmpStreamer::stop_rtmp_stream() {
     src_rtmp_tee_pad = nullptr;
 }
 
-/**
- * @brief Starts the local video streaming by connecting the local video bin to
- * the source bin.
- *
- * The `start_local_stream` function checks if the local video bin is already
- * connected to the pipeline. If not, it connects the local video bin to the
- * source bin using the `connect_sink_bin_to_source_bin` method.
- *
- * Edge Cases:
- * - If the local video bin is already connected, a message is printed and the
- * function returns without making changes.
- * - If connecting the local video bin to the source bin fails, the program
- * exits.
- */
+
 void RtmpStreamer::start_local_stream() {
     GstElement *bin =
         gst_bin_get_by_name(GST_BIN(pipeline), local_video_bin_name);
@@ -531,22 +359,7 @@ void RtmpStreamer::start_local_stream() {
     }
 }
 
-/**
- * @brief Stops the local video streaming by disconnecting the local video bin
- * from the source bin.
- *
- * The `stop_local_stream` function checks if the local video bin is currently
- * connected to the pipeline. If it is, the function disconnects the local video
- * bin from the source bin and updates internal state.
- *
- * Edge Cases:
- * - If the local video bin is already disconnected, a message is printed and
- * the function returns without making changes.
- * - If disconnecting the local video bin from the source bin fails, the program
- * exits.
- * - The `src_local_tee_pad` is set to `nullptr` after disconnection to avoid
- * dangling pointers.
- */
+
 void RtmpStreamer::stop_local_stream() {
     GstElement *bin =
         gst_bin_get_by_name(GST_BIN(pipeline), local_video_bin_name);
@@ -563,33 +376,7 @@ void RtmpStreamer::stop_local_stream() {
     src_local_tee_pad = nullptr;
 }
 
-/**
- * @brief Disconnects a sink bin from a source bin and cleans up associated
- * elements.
- *
- * The `disconnect_sink_bin_from_source_bin` function removes the connection
- * between a sink bin and a source bin. It handles unlinking and removing pads,
- * releasing request pads from the `tee` element, and adjusting the pipeline
- * state.
- *
- * @param source_bin The source bin element from which the sink bin will be
- * disconnected.
- * @param sink_bin The sink bin element to be disconnected.
- * @param tee_pad The pad on the tee element used for the connection.
- * @param tee_ghost_pad_src_name The name of the ghost pad on the source bin
- * that needs to be removed.
- * @return `true` if the disconnection was successful, `false` otherwise.
- *
- * Edge Cases:
- * - If any of the input parameters (bins, pads, or tee element) are invalid or
- * NULL, an error message is printed and `false` is returned.
- * - If locking the pipeline state fails, an error message is printed and
- * `false` is returned.
- * - If unlinking the pads or removing the ghost pad fails, an error message is
- * printed and `false` is returned.
- * - If unlocking the pipeline state fails, an error message is printed and
- * `false` is returned.
- */
+
 bool RtmpStreamer::disconnect_sink_bin_from_source_bin(
     GstElement *source_bin, GstElement *sink_bin, GstPad *tee_pad,
     const char *tee_ghost_pad_src_name) {
@@ -672,39 +459,7 @@ bool RtmpStreamer::disconnect_sink_bin_from_source_bin(
     return true;
 }
 
-/**
- * @brief Connects a sink bin to a source bin using a tee element and a ghost
- * pad.
- *
- * The `connect_sink_bin_to_source_bin` function sets up the necessary
- * connections to integrate a sink bin into a pipeline. It involves adding the
- * sink bin to the pipeline, requesting a pad from the tee element, and linking
- * the ghost pad of the source bin to the sink bin.
- *
- * @param source_bin The source bin element from which the connection will be
- * made.
- * @param sink_bin The sink bin element to be connected.
- * @param request_pad Pointer to a `GstPad` that will be set to the requested
- * pad from the tee element.
- * @param tee_element_name The name of the tee element used to request a pad.
- * @param tee_ghost_pad_name The name of the ghost pad on the source bin that
- * will be created.
- * @return `true` if the connection was successful, `false` otherwise.
- *
- * Edge Cases:
- * - If the source or sink bin is invalid, an error message is printed and
- * `false` is returned.
- * - If locking the pipeline state fails, an error message is printed and
- * `false` is returned.
- * - If adding the sink bin to the pipeline fails, an error message is printed
- * and the program exits.
- * - If the tee element cannot be found, an error message is printed and `false`
- * is returned.
- * - If linking the ghost pads fails, an error message is printed and `false` is
- * returned.
- * - If unlocking the pipeline state fails, an error message is printed and
- * `false` is returned.
- */
+
 bool RtmpStreamer::connect_sink_bin_to_source_bin(
     GstElement *source_bin, GstElement *sink_bin, GstPad **request_pad,
     const char *tee_element_name, const char *tee_ghost_pad_name) {
