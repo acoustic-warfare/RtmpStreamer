@@ -8,11 +8,13 @@ arguments = {
 'python_env': sys.prefix,
 }
 
+
+# cython = '{python_env}/bin/cython'
+# python = '{python_env}/bin/python'
+
 contents = '''[binaries]
 c = 'gcc'
 cpp = 'g++'
-cython = '{python_env}/bin/cython'
-python = '{python_env}/bin/python'
 
 [built-in options]
 prefix = '{python_env}'
