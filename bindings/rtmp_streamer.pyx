@@ -1,7 +1,12 @@
 # distutils: language = c++
 
 from rtmp_streamer cimport RtmpStreamer
-#from rtmp_streamer cimport Mat, Error
+import ctypes
+import numpy as np
+cimport numpy as np
+
+# It's necessary to call "import_array" if you use any part of the numpy PyArray_* API.
+np.import_array()
 
 RGB_BYTECOUNT = 3
 
@@ -20,11 +25,11 @@ cdef class PyRtmpStreamer:
     def stop_stream(self):
         self.c_obj.stop_stream()
 
-    def send_frame(self, frame: np.bytes, width: int, height: int) -> bool :
-        pass
-        # cdef size_t c_size = width * height * RGB_BYTECOUNT
-        # cdef unsigned char *c_frame = <unsigned char *> frame
-        # return self.c_obj.send_frame(c_frame, c_size)
+    def send_frame(self, frame: ctype.POINTER(ctypes.cubyte)) -> bool :
+        cdef size_t c_size = self.width * self.height * RGB_BYTECOUNT
+        cdef unsigned char * c_frame = frame
+        # self.c_obj.send_frame(c, self.width * self.height * RGB_BYTECOUNT)
+        return self.c_obj.send_frame(c_frame, c_size)
 
     def start_rtmp_stream(self):
         self.c_obj.start_rtmp_stream()

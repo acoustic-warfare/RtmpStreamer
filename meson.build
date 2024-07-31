@@ -10,6 +10,12 @@ project(
 include_dirs = include_directories('include', '/usr/include')
 src_dir = 'src'
 bindings_dir = 'bindings/'
+py_bindings_install_dir = join_paths(
+  get_option('prefix'),
+  'lib',
+  'python3.10',
+  'site-packages',
+)
 
 # Source files
 cpp_files = files(join_paths(src_dir, 'rtmp.cpp'))
@@ -29,6 +35,7 @@ libdynrt = library(
   include_directories: include_dirs,
   cpp_args: ['-std=c++17'], # Ensure C++17 standard is used
   install: true, # Mark the shared library for installation
+  install_dir: get_option('libdir'),
 )
 
 # Python module setup
@@ -45,15 +52,16 @@ cython_extension = py.extension_module(
   include_directories: include_dirs,
   cython_args: cython_args,
   link_with: libdynrt,
-  override_options: ['cython_language=cpp'], # Ensure C++ standard is consistent
+  override_options: ['cython_language=cpp'], # Ensure to compile cython to c++
   cpp_args: ['-std=c++17'], # Ensure C++17 standard is used
   install: true,
+  install_dir: py_bindings_install_dir,
 )
 
-# Optionally install headers
+# install headers
 install_headers('include/rtmp.hpp', subdir: 'DynRT')
 
-# Optionally install pkg-config file
+# Install pkg-config file
 pkg_config = import('pkgconfig')
 pkg_config.generate(
   name: 'DynRT',
