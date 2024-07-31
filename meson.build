@@ -3,14 +3,9 @@ project(
   'cpp',
   'cython',
   version: '0.1.0',
-  default_options: [
-    'buildtype=release',
-    'cpp_std=c++17',
-    'python.install_venv=auto',
-    'python.platformdir=True',
-  ],
+  default_options: ['buildtype=release', 'cpp_std=c++17'],
 )
-
+# 'python.install_venv=auto'
 # Define directories
 include_dirs = include_directories('include', '/usr/include')
 src_dir = 'src'
