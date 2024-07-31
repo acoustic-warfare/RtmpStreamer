@@ -3,19 +3,18 @@ project(
   'cpp',
   'cython',
   version: '0.1.0',
-  default_options: ['buildtype=release', 'cpp_std=c++17'],
+  default_options: [
+    'buildtype=release',
+    'cpp_std=c++17',
+    'python.install_venv=auto',
+    'python.platformdir=True',
+  ],
 )
 
 # Define directories
 include_dirs = include_directories('include', '/usr/include')
 src_dir = 'src'
 bindings_dir = 'bindings/'
-py_bindings_install_dir = join_paths(
-  get_option('prefix'),
-  'lib',
-  'python3.10',
-  'site-packages',
-)
 
 # Source files
 cpp_files = files(join_paths(src_dir, 'rtmp.cpp'))
@@ -35,7 +34,6 @@ libdynrt = library(
   include_directories: include_dirs,
   cpp_args: ['-std=c++17'], # Ensure C++17 standard is used
   install: true, # Mark the shared library for installation
-  install_dir: get_option('libdir'),
 )
 
 # Python module setup
@@ -55,7 +53,6 @@ cython_extension = py.extension_module(
   override_options: ['cython_language=cpp'], # Ensure to compile cython to c++
   cpp_args: ['-std=c++17'], # Ensure C++17 standard is used
   install: true,
-  install_dir: py_bindings_install_dir,
 )
 
 # install headers
