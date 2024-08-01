@@ -78,6 +78,7 @@ void RtmpStreamer::start_stream() {
     }
     start_rtmp_stream();
     start_local_stream();
+    gst_element_set_state(pipeline, GST_STATE_PLAYING);
     bus = gst_element_get_bus(pipeline);
 }
 
@@ -92,6 +93,7 @@ void RtmpStreamer::stop_stream() {
     }
     stop_rtmp_stream();
     stop_local_stream();
+    gst_element_set_state(pipeline, GST_STATE_NULL);
     gst_object_unref(bus);
     bus = nullptr;
 }
@@ -254,10 +256,10 @@ void RtmpStreamer::initialize_streamer() {
     // src_rtmp_tee_pad = gst_element_request_pad_simple(tee, "src_%u");
     // src_local_tee_pad = gst_element_request_pad_simple(tee, "src_%u");
 
-    gst_element_add_pad(source_bin,
-                        gst_ghost_pad_new("tee_rtmp_src", src_rtmp_tee_pad));
-    gst_element_add_pad(
-        source_bin, gst_ghost_pad_new("local_video_src", src_local_tee_pad));
+    // gst_element_add_pad(source_bin,
+    //                     gst_ghost_pad_new("tee_rtmp_src", src_rtmp_tee_pad));
+    // gst_element_add_pad(
+    //     source_bin, gst_ghost_pad_new("local_video_src", src_local_tee_pad));
 
     // GstPad *source_bin_rtmp =
     //     gst_element_get_static_pad(source_bin, "tee_rtmp_src");
