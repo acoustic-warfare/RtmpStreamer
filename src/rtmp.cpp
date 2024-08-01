@@ -49,7 +49,9 @@ RtmpStreamer::RtmpStreamer()
     : screen_width(1024),
       screen_height(1024),
       want_data(false),
-      connected_bins_to_source(0) {
+      connected_bins_to_source(0),
+      appsrc_need_data_id(0),
+      appsrc_enough_data_id(0) {
     initialize_streamer();
 }
 
@@ -57,7 +59,9 @@ RtmpStreamer::RtmpStreamer(uint width, uint height)
     : screen_width(width),
       screen_height(height),
       want_data(false),
-      connected_bins_to_source(0) {
+      connected_bins_to_source(0),
+      appsrc_need_data_id(0),
+      appsrc_enough_data_id(0) {
     initialize_streamer();
 }
 
@@ -69,10 +73,12 @@ RtmpStreamer::~RtmpStreamer() {
 
 void RtmpStreamer::start_stream() {
     if (appsrc_need_data_id == 0) {
+        gst_println("need-data setup");
         appsrc_need_data_id = g_signal_connect(
             appsrc, "need-data", G_CALLBACK(cb_need_data), &want_data);
     }
     if (appsrc_enough_data_id == 0) {
+        gst_println("enough-data setup");
         appsrc_enough_data_id = g_signal_connect(
             appsrc, "enough-data", G_CALLBACK(cb_enough_data), &want_data);
     }
