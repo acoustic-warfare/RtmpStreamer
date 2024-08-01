@@ -12,11 +12,13 @@ RGB_BYTECOUNT = 3
 
 cdef class PyRtmpStreamer:
     cdef RtmpStreamer *c_obj
+    cdef unsigned int width
+    cdef unsigned int height
 
     def __cinit__(self, width=1024, height=1024):
-        cdef unsigned int c_width = width
-        cdef unsigned int c_height = height
-        self.c_obj = new RtmpStreamer(c_width, c_height)
+        self.width = width
+        self.height = height
+        self.c_obj = new RtmpStreamer(self.width, self.height)
 
     def __dealloc__(self):
         del self.c_obj
