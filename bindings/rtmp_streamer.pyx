@@ -29,9 +29,9 @@ cdef class PyRtmpStreamer:
     def stop_stream(self):
         self.c_obj.stop_stream()
 
-    def send_frame(self, frame: ctype.POINTER(ctypes.cubyte)) -> bool :
+    def send_frame(self, frame: bytes) -> bool :
         cdef size_t c_size = self.width * self.height * RGB_BYTECOUNT
-        cdef unsigned char * c_frame = frame
+        cdef unsigned char * c_frame = <unsigned char *> frame
         # self.c_obj.send_frame(c, self.width * self.height * RGB_BYTECOUNT)
         return self.c_obj.send_frame(c_frame, c_size)
 
