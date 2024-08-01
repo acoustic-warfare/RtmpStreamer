@@ -507,6 +507,7 @@ bool RtmpStreamer::disconnect_sink_bin_from_source_bin(
 bool RtmpStreamer::connect_sink_bin_to_source_bin(
     GstElement *source_bin, GstElement *sink_bin, GstPad **request_pad,
     const char *tee_element_name, const char *tee_ghost_pad_name) {
+    gst_print("Hello\n");
     if (!source_bin || !sink_bin) {
         gst_printerr("Invalid source- or sink-bin, \n");
         return false;
@@ -565,6 +566,7 @@ bool RtmpStreamer::connect_sink_bin_to_source_bin(
     }
 
     gst_element_set_state(sink_bin, GST_STATE_PLAYING);
+    gst_print("Hello\n");
 
     // Unref objects
     gst_object_unref(src_ghost_pad);
