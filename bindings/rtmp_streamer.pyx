@@ -15,7 +15,7 @@ cdef class PyRtmpStreamer:
     cdef unsigned int width
     cdef unsigned int height
 
-    def __cinit__(self, width=1024, height=1024):
+    def __cinit__(self, width: int, height: int):
         self.width = width
         self.height = height
         self.c_obj = new RtmpStreamer(self.width, self.height)
