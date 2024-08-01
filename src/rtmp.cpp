@@ -237,7 +237,7 @@ void RtmpStreamer::initialize_streamer() {
     rtmp_bin_name = gst_element_get_name(rtmp_bin);
 
     local_video_bin = gst_parse_bin_from_description(
-        "queue name=local_video_queue ! glimagesink "
+        "queue name=local_video_queue ! autovideosink "
         "name=local_video_sink",
         true, nullptr);
     local_video_bin_name = gst_element_get_name(local_video_bin);
