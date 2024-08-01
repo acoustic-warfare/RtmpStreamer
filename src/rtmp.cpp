@@ -244,8 +244,9 @@ void RtmpStreamer::initialize_streamer() {
         exit(1);
     }
 
-    gst_bin_add_many(GST_BIN(pipeline), source_bin, rtmp_bin, local_video_bin,
-                     NULL);
+    gst_bin_add(GST_BIN(pipeline), source_bin);
+    //gst_bin_add_many(GST_BIN(pipeline), source_bin, rtmp_bin, local_video_bin,
+     //                NULL);
 
     // GstElement *tee = gst_bin_get_by_name(GST_BIN(source_bin), "tee");
     // if (!tee) {
