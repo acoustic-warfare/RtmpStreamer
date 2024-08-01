@@ -95,7 +95,6 @@ void RtmpStreamer::stop_stream() {
 }
 
 bool RtmpStreamer::send_frame_to_appsrc(void *data, size_t size) {
-    static guint64 count = 0;
     GstBuffer *buffer;
     GstFlowReturn ret;
 
@@ -125,7 +124,6 @@ bool RtmpStreamer::send_frame_to_appsrc(void *data, size_t size) {
         gst_printerr("Invalid buffer duration.!\n");
         exit(1);
     }
-    count += GST_SECOND / 30;
 
     // Copy the cv::Mat data into the GStreamer buffer
     GstMapInfo map;
@@ -349,6 +347,10 @@ void RtmpStreamer::start_rtmp_stream() {
                                         "tee", "tee_rtmp_src")) {
         exit(1);
     }
+    connected_bins_to_source += 1;
+    if (connected_bins_to_source == 1) {
+        gst_element_set_state(pipeline, GST_STATE_PLAYING);
+    }
 }
 
 void RtmpStreamer::stop_rtmp_stream() {
@@ -358,6 +360,10 @@ void RtmpStreamer::stop_rtmp_stream() {
         return;
     }
     g_object_unref(bin);
+    connected_bins_to_source -= 1;
+    if (connected_bins_to_source == 0) {
+        gst_element_set_state(pipeline, GST_STATE_NULL);
+    }
     if (!disconnect_sink_bin_from_source_bin(
             source_bin, rtmp_bin, src_rtmp_tee_pad, "tee_rtmp_src")) {
         exit(1);
@@ -378,6 +384,11 @@ void RtmpStreamer::start_local_stream() {
                                         "local_video_src")) {
         exit(1);
     }
+
+    connected_bins_to_source += 1;
+    if (connected_bins_to_source == 1) {
+        gst_element_set_state(pipeline, GST_STATE_PLAYING);
+    }
 }
 
 void RtmpStreamer::stop_local_stream() {
@@ -388,6 +399,10 @@ void RtmpStreamer::stop_local_stream() {
         return;
     }
     g_object_unref(bin);
+    connected_bins_to_source -= 1;
+    if (connected_bins_to_source == 0) {
+        gst_element_set_state(pipeline, GST_STATE_NULL);
+    }
     if (!disconnect_sink_bin_from_source_bin(source_bin, local_video_bin,
                                              src_local_tee_pad,
                                              "local_video_src")) {
