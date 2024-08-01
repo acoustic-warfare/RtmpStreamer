@@ -13,3 +13,4 @@ cdef extern from "rtmp.hpp":
         void stop_rtmp_stream()
         void start_local_stream()
         void stop_local_stream()
+        void debug_info()

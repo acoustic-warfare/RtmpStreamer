@@ -45,3 +45,6 @@ cdef class PyRtmpStreamer:
 
     def stop_local_stream(self):
         self.c_obj.stop_local_stream()
+
+    def debug_info(self):
+        self.c_obj.debug_info()
