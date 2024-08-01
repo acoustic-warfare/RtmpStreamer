@@ -138,7 +138,7 @@ bool RtmpStreamer::send_frame_to_appsrc(void *data, size_t size) {
     // Copy the cv::Mat data into the GStreamer buffer
     GstMapInfo map;
     gst_buffer_map(buffer, &map, GST_MAP_WRITE);
-    memcpy(map.data, data, size);
+    memcpy(map.data, *data, size);
     gst_buffer_unmap(buffer, &map);
 
     // Push the buffer to appsrc
@@ -174,7 +174,7 @@ bool RtmpStreamer::send_frame(unsigned char *frame, size_t size) {
     }
     want_data_muxex.unlock();
 
-    return send_frame_to_appsrc((void *)frame, size);
+    return send_frame_to_appsrc((void *)&frame, size);
 }
 
 bool RtmpStreamer::send_frame(cv::Mat frame) {
