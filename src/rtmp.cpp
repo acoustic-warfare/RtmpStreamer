@@ -147,6 +147,8 @@ bool RtmpStreamer::send_frame_to_appsrc(void *data, size_t size) {
         return FALSE;
     }
 
+    std::cout << "sent frame\n";
+
     return TRUE;
 }
 
@@ -174,8 +176,10 @@ bool RtmpStreamer::send_frame(cv::Mat frame) {
         g_printerr("Captured frame is empty.\n");
         return FALSE;
     }
+    std::cout << "1\n";
 
     std::lock_guard<std::mutex> guard(handling_pipeline);
+    std::cout << "2\n";
 
     want_data_muxex.lock();
     if (!want_data) {
@@ -184,21 +188,26 @@ bool RtmpStreamer::send_frame(cv::Mat frame) {
         return FALSE;
     }
     want_data_muxex.unlock();
+    std::cout << "3\n";
 
     // Ensure the frame is in RGB format
     if (frame.channels() == 4) {
         cv::cvtColor(frame, frame, cv::COLOR_BGRA2RGB);
+        std::cout << "4\n";
     } else if (frame.channels() == 3) {
         cv::cvtColor(frame, frame, cv::COLOR_BGR2RGB);
+        std::cout << "4\n";
     } else {
         g_printerr("Captured frame is not in a supported format.\n");
         return FALSE;
     }
 
+    std::cout << "5\n";
     if (!send_frame_to_appsrc(&frame.data, frame.total() * frame.elemSize())) {
         return FALSE;
     }
 
+    std::cout << "5\n";
     return TRUE;
 }
 
