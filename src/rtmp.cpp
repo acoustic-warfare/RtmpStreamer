@@ -1,11 +1,11 @@
 #include "rtmp.hpp"
 
+#include <fmt/core.h>
+
 #include <mutex>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/videoio.hpp>
 #include <string>
-
-#include "glib-object.h"
 
 #define RGB_BYTES 3
 std::mutex RtmpStreamer::want_data_muxex = std::mutex();
@@ -150,7 +150,7 @@ bool RtmpStreamer::send_frame_to_appsrc(void *data, size_t size) {
     return TRUE;
 }
 
-bool RtmpStreamer::send_frame(uint8_t *frame, size_t size) {
+bool RtmpStreamer::send_frame(unsigned char *frame, size_t size) {
     if (size <= 0) {
         g_printerr("Captured frame is empty.\n");
         return FALSE;
@@ -212,14 +212,17 @@ void RtmpStreamer::initialize_streamer() {
         exit(1);
     }
 
-    source_bin = gst_parse_bin_from_description(
+    auto source_setup_string = fmt::format(
         "appsrc name=appsrc is-live=true block=false "
         "format=GST_FORMAT_TIME "
-        "caps=video/x-raw,format=RGB,framerate=60/1,width=1024,height=1024 "
+        "caps=video/x-raw,format=RGB,framerate=60/1,width={},height={} "
         "! videoconvert name=videoconvert ! videoscale name=videoscale ! "
         "videorate name=videorate ! "
         "video/x-raw,framerate=30/1,width=512,height=512 ! tee name=tee",
-        false, nullptr);
+        screen_width, screen_height);
+
+    source_bin = gst_parse_bin_from_description(source_setup_string.c_str(),
+                                                false, nullptr);
 
     source_bin_name = gst_element_get_name(source_bin);
 
@@ -245,8 +248,9 @@ void RtmpStreamer::initialize_streamer() {
     }
 
     gst_bin_add(GST_BIN(pipeline), source_bin);
-    //gst_bin_add_many(GST_BIN(pipeline), source_bin, rtmp_bin, local_video_bin,
-     //                NULL);
+    // gst_bin_add_many(GST_BIN(pipeline), source_bin, rtmp_bin,
+    // local_video_bin,
+    //                 NULL);
 
     // GstElement *tee = gst_bin_get_by_name(GST_BIN(source_bin), "tee");
     // if (!tee) {
@@ -303,7 +307,8 @@ void RtmpStreamer::initialize_streamer() {
     // gst_object_unref(tee);
 }
 
-[[maybe_unused]] static void set_element_state_to_parent_state(GstElement *element) {
+[[maybe_unused]] static void set_element_state_to_parent_state(
+    GstElement *element) {
     GstElement *parent;
     GstState parent_state, parent_pending;
     GstStateChangeReturn ret;

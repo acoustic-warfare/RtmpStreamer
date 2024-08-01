@@ -20,14 +20,14 @@ gstreamer_dep = dependency('gstreamer-1.0', version: '>=1.0', required: true)
 opencv_dep = dependency('opencv4', required: true)
 thread_dep = dependency('threads', required: true)
 gst_app_dep = dependency('gstreamer-app-1.0', required: true)
+fmt_dep = dependency('fmt', required: true)
 
 # Build the C++ library
 libdynrt = library(
   'DynRT',
   sources: cpp_files,
-  dependencies: [gstreamer_dep, opencv_dep, thread_dep],
+  dependencies: [gstreamer_dep, opencv_dep, thread_dep, fmt_dep],
   include_directories: include_dirs,
-  cpp_args: ['-std=c++17'], # Ensure C++17 standard is used
   install: true, # Mark the shared library for installation
 )
 
@@ -56,9 +56,8 @@ cython_extension = py.extension_module(
   link_with: libdynrt,
   override_options: ['cython_language=cpp'], # Ensure to compile cython to c++
   cpp_args: [
-    '-std=c++17',
     '-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION',
-  ], # Ensure C++17 standard is used
+  ], # Ensure C++20 standard is used
   install: true,
 )
 
