@@ -45,8 +45,8 @@ npy_include_path = run_command(
 
 # Cython compiler options
 cython_args = ['-Xboundscheck=False']
-
 cython_include_dirs = include_directories('include', npy_include_path)
+
 cython_extension = py.extension_module(
   'rtmp_streamer',
   sources: pyx_files,

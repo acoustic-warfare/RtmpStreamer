@@ -5,6 +5,7 @@
 #include <opencv2/videoio.hpp>
 #include <string>
 
+#include "glib-object.h"
 
 #define RGB_BYTES 3
 std::mutex RtmpStreamer::want_data_muxex = std::mutex();
@@ -45,12 +46,18 @@ void RtmpStreamer::cb_enough_data(GstAppSrc *appsrc, gpointer user_data) {
 }
 
 RtmpStreamer::RtmpStreamer()
-    : screen_width(1024), screen_height(1024), want_data(false) {
+    : screen_width(1024),
+      screen_height(1024),
+      want_data(false),
+      connected_bins_to_source(0) {
     initialize_streamer();
 }
 
 RtmpStreamer::RtmpStreamer(uint width, uint height)
-    : screen_width(width), screen_height(height), want_data(false) {
+    : screen_width(width),
+      screen_height(height),
+      want_data(false),
+      connected_bins_to_source(0) {
     initialize_streamer();
 }
 
@@ -61,20 +68,30 @@ RtmpStreamer::~RtmpStreamer() {
 }
 
 void RtmpStreamer::start_stream() {
-    appsrc = gst_bin_get_by_name(GST_BIN(source_bin), "appsrc");
-    if (!appsrc) {
-        gst_printerr("error extracting appsrc\n");
-        exit(1);
+    if (appsrc_need_data_id == 0) {
+        appsrc_need_data_id = g_signal_connect(
+            appsrc, "need-data", G_CALLBACK(cb_need_data), &want_data);
     }
-    g_signal_connect(appsrc, "need-data", G_CALLBACK(cb_need_data), &want_data);
-    g_signal_connect(appsrc, "enough-data", G_CALLBACK(cb_enough_data),
-                     &want_data);
-    gst_element_set_state(pipeline, GST_STATE_PLAYING);
+    if (appsrc_enough_data_id == 0) {
+        appsrc_enough_data_id = g_signal_connect(
+            appsrc, "enough-data", G_CALLBACK(cb_enough_data), &want_data);
+    }
+    start_rtmp_stream();
+    start_local_stream();
     bus = gst_element_get_bus(pipeline);
 }
 
 void RtmpStreamer::stop_stream() {
-    gst_element_set_state(pipeline, GST_STATE_NULL);
+    if (appsrc_need_data_id != 0) {
+        g_signal_handler_disconnect(appsrc, appsrc_need_data_id);
+        appsrc_need_data_id = 0;
+    }
+    if (appsrc_enough_data_id != 0) {
+        g_signal_handler_disconnect(appsrc, appsrc_enough_data_id);
+        appsrc_enough_data_id = 0;
+    }
+    stop_rtmp_stream();
+    stop_local_stream();
 }
 
 bool RtmpStreamer::send_frame_to_appsrc(void *data, size_t size) {
@@ -177,8 +194,10 @@ bool RtmpStreamer::send_frame(cv::Mat frame) {
     }
 
     if (!send_frame_to_appsrc(&frame.data, frame.total() * frame.elemSize())) {
-        return false;
+        return FALSE;
     }
+
+    return TRUE;
 }
 
 void RtmpStreamer::initialize_streamer() {
@@ -268,14 +287,19 @@ void RtmpStreamer::initialize_streamer() {
         exit(1);
     }
 
+    appsrc = gst_bin_get_by_name(GST_BIN(source_bin), "appsrc");
+    if (!appsrc) {
+        gst_printerr("error extracting appsrc\n");
+        exit(1);
+    }
+
     gst_object_unref(source_bin_rtmp);
     gst_object_unref(source_bin_video);
     gst_object_unref(rtmp_sink_pad);
     gst_object_unref(local_video_sink_pad);
 }
 
-
-static void set_element_state_to_parent_state(GstElement *element) {
+[[maybe_unused]] static void set_element_state_to_parent_state(GstElement *element) {
     GstElement *parent;
     GstState parent_state, parent_pending;
     GstStateChangeReturn ret;
@@ -313,7 +337,6 @@ static void set_element_state_to_parent_state(GstElement *element) {
     gst_object_unref(parent);
 }
 
-
 void RtmpStreamer::start_rtmp_stream() {
     GstElement *bin = gst_bin_get_by_name(GST_BIN(pipeline), rtmp_bin_name);
     if (bin) {
@@ -328,7 +351,6 @@ void RtmpStreamer::start_rtmp_stream() {
     }
 }
 
-
 void RtmpStreamer::stop_rtmp_stream() {
     GstElement *bin = gst_bin_get_by_name(GST_BIN(pipeline), rtmp_bin_name);
     if (!bin) {
@@ -342,7 +364,6 @@ void RtmpStreamer::stop_rtmp_stream() {
     }
     src_rtmp_tee_pad = nullptr;
 }
-
 
 void RtmpStreamer::start_local_stream() {
     GstElement *bin =
@@ -359,7 +380,6 @@ void RtmpStreamer::start_local_stream() {
     }
 }
 
-
 void RtmpStreamer::stop_local_stream() {
     GstElement *bin =
         gst_bin_get_by_name(GST_BIN(pipeline), local_video_bin_name);
@@ -375,7 +395,6 @@ void RtmpStreamer::stop_local_stream() {
     }
     src_local_tee_pad = nullptr;
 }
-
 
 bool RtmpStreamer::disconnect_sink_bin_from_source_bin(
     GstElement *source_bin, GstElement *sink_bin, GstPad *tee_pad,
@@ -451,14 +470,13 @@ bool RtmpStreamer::disconnect_sink_bin_from_source_bin(
     }
 
     // Set everyting but the disconnected Bin to PLAYING state
-    gst_element_set_state(pipeline, GST_STATE_PLAYING);
+    // gst_element_set_state(pipeline, GST_STATE_PLAYING);
 
     // Clean up
     gst_object_unref(tee);
 
     return true;
 }
-
 
 bool RtmpStreamer::connect_sink_bin_to_source_bin(
     GstElement *source_bin, GstElement *sink_bin, GstPad **request_pad,
@@ -613,7 +631,7 @@ bool RtmpStreamer::check_error() const {
                 g_free(debug_info);
                 return true;
             case GST_MESSAGE_EOS:
-                //std::cout << "end" << std::endl;
+                // std::cout << "end" << std::endl;
                 g_print("End-Of-Stream reached.\n");
                 return true;
             default:

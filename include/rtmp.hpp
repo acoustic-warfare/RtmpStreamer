@@ -113,13 +113,18 @@ class RtmpStreamer {
     gboolean check_links();
     void initialize_streamer();
 
+    static std::mutex want_data_muxex;
+    static std::mutex handling_pipeline;
+
+    uint screen_width, screen_height;
+    bool want_data;
+    int connected_bins_to_source;
     GstElement *pipeline, *source_bin, *rtmp_bin, *local_video_bin;
     gchar *source_bin_name, *rtmp_bin_name, *local_video_bin_name;
     GstElement *appsrc;
     GstPad *src_rtmp_tee_pad, *src_local_tee_pad;
 
-    bool want_data;
-    uint screen_width, screen_height;
-    static std::mutex want_data_muxex;
-    static std::mutex handling_pipeline;
+    gint appsrc_need_data_id;
+    gint appsrc_enough_data_id;
+
 };
