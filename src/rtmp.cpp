@@ -92,6 +92,8 @@ void RtmpStreamer::stop_stream() {
     }
     stop_rtmp_stream();
     stop_local_stream();
+    gst_object_unref(bus);
+    bus = nullptr;
 }
 
 bool RtmpStreamer::send_frame_to_appsrc(void *data, size_t size) {
@@ -243,47 +245,47 @@ void RtmpStreamer::initialize_streamer() {
     gst_bin_add_many(GST_BIN(pipeline), source_bin, rtmp_bin, local_video_bin,
                      NULL);
 
-    GstElement *tee = gst_bin_get_by_name(GST_BIN(source_bin), "tee");
-    if (!tee) {
-        gst_printerrln("Unable to retreive tee element.");
-        exit(1);
-    }
+    // GstElement *tee = gst_bin_get_by_name(GST_BIN(source_bin), "tee");
+    // if (!tee) {
+    //     gst_printerrln("Unable to retreive tee element.");
+    //     exit(1);
+    // }
 
-    src_rtmp_tee_pad = gst_element_request_pad_simple(tee, "src_%u");
-    src_local_tee_pad = gst_element_request_pad_simple(tee, "src_%u");
+    // src_rtmp_tee_pad = gst_element_request_pad_simple(tee, "src_%u");
+    // src_local_tee_pad = gst_element_request_pad_simple(tee, "src_%u");
 
     gst_element_add_pad(source_bin,
                         gst_ghost_pad_new("tee_rtmp_src", src_rtmp_tee_pad));
     gst_element_add_pad(
         source_bin, gst_ghost_pad_new("local_video_src", src_local_tee_pad));
 
-    GstPad *source_bin_rtmp =
-        gst_element_get_static_pad(source_bin, "tee_rtmp_src");
-    GstPad *rtmp_sink_pad = gst_element_get_static_pad(rtmp_bin, "sink");
-    GstPadLinkReturn rtmp_link_result =
-        gst_pad_link(source_bin_rtmp, rtmp_sink_pad);
-    if (rtmp_link_result != GST_PAD_LINK_OK) {
-        gst_printerrln(
-            "Unable to link request-pads to video and rtmp bins. rtmp "
-            "result: %d.",
-            rtmp_link_result);
-        exit(1);
-    }
+    // GstPad *source_bin_rtmp =
+    //     gst_element_get_static_pad(source_bin, "tee_rtmp_src");
+    // GstPad *rtmp_sink_pad = gst_element_get_static_pad(rtmp_bin, "sink");
+    // GstPadLinkReturn rtmp_link_result =
+    //     gst_pad_link(source_bin_rtmp, rtmp_sink_pad);
+    // if (rtmp_link_result != GST_PAD_LINK_OK) {
+    //     gst_printerrln(
+    //         "Unable to link request-pads to video and rtmp bins. rtmp "
+    //         "result: %d.",
+    //         rtmp_link_result);
+    //     exit(1);
+    // }
 
-    GstPad *source_bin_video =
-        gst_element_get_static_pad(source_bin, "local_video_src");
-    GstPad *local_video_sink_pad =
-        gst_element_get_static_pad(local_video_bin, "sink");
-    GstPadLinkReturn video_link_result =
-        gst_pad_link(source_bin_video, local_video_sink_pad);
-
-    if (video_link_result != GST_PAD_LINK_OK) {
-        gst_printerrln(
-            "Unable to link request-pads to video and rtmp bins.video "
-            "result: %d.",
-            video_link_result);
-        exit(1);
-    }
+    // GstPad *source_bin_video =
+    //     gst_element_get_static_pad(source_bin, "local_video_src");
+    // GstPad *local_video_sink_pad =
+    //     gst_element_get_static_pad(local_video_bin, "sink");
+    // GstPadLinkReturn video_link_result =
+    //     gst_pad_link(source_bin_video, local_video_sink_pad);
+    //
+    // if (video_link_result != GST_PAD_LINK_OK) {
+    //     gst_printerrln(
+    //         "Unable to link request-pads to video and rtmp bins.video "
+    //         "result: %d.",
+    //         video_link_result);
+    //     exit(1);
+    // }
 
     appsrc = gst_bin_get_by_name(GST_BIN(source_bin), "appsrc");
     if (!appsrc) {
@@ -291,10 +293,11 @@ void RtmpStreamer::initialize_streamer() {
         exit(1);
     }
 
-    gst_object_unref(source_bin_rtmp);
-    gst_object_unref(source_bin_video);
-    gst_object_unref(rtmp_sink_pad);
-    gst_object_unref(local_video_sink_pad);
+    // gst_object_unref(source_bin_rtmp);
+    // gst_object_unref(source_bin_video);
+    // gst_object_unref(rtmp_sink_pad);
+    // gst_object_unref(local_video_sink_pad);
+    // gst_object_unref(tee);
 }
 
 [[maybe_unused]] static void set_element_state_to_parent_state(GstElement *element) {
