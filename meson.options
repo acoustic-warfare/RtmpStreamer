@@ -1,0 +1,3 @@
+option('python-bindings', type: 'boolean', value: false)
+option('build-tests', type: 'boolean', value: true)
+option('build-examples', type: 'boolean', value: false)

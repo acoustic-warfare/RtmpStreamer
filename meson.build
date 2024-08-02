@@ -3,26 +3,30 @@ project(
   'cpp',
   'cython',
   version: '0.1.0',
+  meson_version: '>= 1.1.0',
   default_options: ['buildtype=release', 'cpp_std=c++17'],
 )
-# 'python.install_venv=auto'
-# Define directories
-include_dirs = include_directories('include', '/usr/include')
-src_dir = 'src'
-bindings_dir = 'bindings/'
 
-# Source files
-cpp_files = files(join_paths(src_dir, 'rtmp.cpp'))
-pyx_files = files(join_paths(bindings_dir, 'rtmp_streamer.pyx'))
+include_dirs = [include_directories('include')]
 
+# ----------------------------------------- #
+# source files
+# ----------------------------------------- #
+cpp_files = files('src/rtmp.cpp')
+
+# ----------------------------------------- #
 # Dependencies
-gstreamer_dep = dependency('gstreamer-1.0', version: '>=1.0', required: true)
-opencv_dep = dependency('opencv4', required: true)
+# ----------------------------------------- #
+gstreamer_dep = dependency('gstreamer-1.0', required: true)
+opencv_dep = dependency('opencv4', version: '>= 4.0', required: true)
 thread_dep = dependency('threads', required: true)
 gst_app_dep = dependency('gstreamer-app-1.0', required: true)
 fmt_dep = dependency('fmt', required: true)
 
-# Build the C++ library
+# ----------------------------------------- #
+# library object
+# ----------------------------------------- #
+#
 libdynrt = library(
   'DynRT',
   sources: cpp_files,
@@ -37,35 +41,9 @@ libdynrt = library(
   install: true, # Mark the shared library for installation
 )
 
-# Python module setup
-py = import('python').find_installation()
-py_dep = py.dependency()
-
-npy_include_path = run_command(
-  py,
-  [
-    '-c', 'import os; os.chdir(".."); import numpy; print(os.path.abspath(numpy.get_include()))',
-  ],
-  check: true,
-).stdout().strip()
-
-# Cython compiler options
-cython_args = ['-Xboundscheck=False']
-cython_include_dirs = include_directories('include', npy_include_path)
-
-cython_extension = py.extension_module(
-  'rtmp_streamer',
-  sources: pyx_files,
-  dependencies: [opencv_dep, py_dep, gst_app_dep, gstreamer_dep],
-  include_directories: cython_include_dirs,
-  cython_args: cython_args,
-  link_with: libdynrt,
-  override_options: ['cython_language=cpp'], # Ensure to compile cython to c++
-  cpp_args: [
-    '-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION',
-  ], # Ensure C++20 standard is used
-  install: true,
-)
+if get_option('python-bindings')
+  subdir('bindings')
+endif
 
 # install headers
 install_headers('include/rtmp.hpp', subdir: 'DynRT')
