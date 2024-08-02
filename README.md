@@ -135,8 +135,24 @@ int main(int argc, char *argv[]) {
 }
 ```
 
+```python
+from rtmp_streamer import PyRtmpStreamer
+import numpy as np
+import time
 
+SCREEN_WIDTH = 1920
+SCREEN_HEIGHT = 1080
 
+if __name__ == "__main__":
+    # Initialize the streamer with a with and a height for the video input
+    streamer = PyRtmpStreamer(SCREEN_WIDTH, SCREEN_HEIGHT)
 
+    # Only start the rtmp stream
+    streamer.start_stream()
 
-
+    # create a frame to display
+    frame = np.zeros((SCREEN_HEIGHT,SCREEN_WIDTH, 3))
+    while True:
+        streamer.send_frame(frame.tobytes())
+        time.sleep(1000//30)
+```

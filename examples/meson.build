@@ -1,9 +1,28 @@
-dynrt_dep = dependency('dynrt')
-
+# ----------------------------------------- #
 # C++ example
+# ----------------------------------------- #
+
+# Dependencies
+dependencies = [dependency('dynrt'), opencv_dep]
+
+# Executable
 test_exe = executable(
-  'test_exe',
+  'example_cpp',
   sources: ['example.cpp'],
-  dependencies: [opencv_dep, dynrt_dep],
+  dependencies: dependencies,
   include_directories: include_dirs,
+  install: false,
+)
+
+# ----------------------------------------- #
+# Python example
+# ----------------------------------------- #
+
+# Configure data
+config_data = configuration_data()
+
+configure_file(
+  input: 'example.py.in',
+  output: 'example.py',
+  configuration: config_data,
 )
