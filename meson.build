@@ -26,7 +26,13 @@ fmt_dep = dependency('fmt', required: true)
 libdynrt = library(
   'DynRT',
   sources: cpp_files,
-  dependencies: [gstreamer_dep, opencv_dep, thread_dep, fmt_dep],
+  dependencies: [
+    gstreamer_dep,
+    gst_app_dep,
+    opencv_dep,
+    thread_dep,
+    fmt_dep,
+  ],
   include_directories: include_dirs,
   install: true, # Mark the shared library for installation
 )
@@ -67,7 +73,7 @@ install_headers('include/rtmp.hpp', subdir: 'DynRT')
 # Install pkg-config file
 pkg_config = import('pkgconfig')
 pkg_config.generate(
-  name: 'DynRT',
+  name: 'dynrt',
   description: 'Dynamic Real-Time library',
   filebase: 'dynrt',
   libraries: libdynrt,
