@@ -30,6 +30,8 @@ int main(int argc, char *argv[]) {
     });
 
     while (true) {
+        // Pass the frame on to the streamer pipeline to be shown locally and/or sent up to waraps.
+        // Streamer does not take ownership of the frame and does not change anything in the frame.
         streamer.send_frame(frame);
 
         // Only returns when user has typed "quit" in the terminal

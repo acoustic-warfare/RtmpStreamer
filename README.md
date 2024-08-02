@@ -43,8 +43,19 @@ A lot of the libraries can also be installed from source. Here are a few links t
 - [opencv](https://github.com/opencv/opencv/tree/4.10.0)
 - [fmt](https://github.com/fmtlib/fmt)
 
-## Usecase
-Here is an example *C++* usecase with comments:
+# Install DynRT
+The library can be installed with the following series of commands:
+```
+git clone https://github.com/acoustic-warfare/DynRT-streamer && \
+cd DynRT-streamer
+meson setup build --native-file native-file.ini
+ninja -C build
+sudo ninja -C build install
+```
+
+
+# Usecase
+*C++* usecase with comments:
 ```c++
 #include <future>
 #include <rtmp.hpp>
@@ -70,12 +81,17 @@ int main(int argc, char *argv[]) {
         std::async(std::launch::async,
                    &RtmpStreamer::async_streamer_control_unit, &streamer);
 
+    // do some color manipulation on the frame
     frame.forEach<Pixel>([](Pixel &pix, const int *position) {
         pix.x = 255;
+        pix.y = 0;
+        pix.z = 0;
     });
+
     while (true) {
+        // Pass the frame on to the streamer pipeline to be shown locally and/or sent up to waraps.
+        // Streamer does not take ownership of the frame and does not change anything in the frame.
         streamer.send_frame(frame);
-        std::cout << "sent a frame" << std::endl;
 
         // Only returns when user has typed "quit" in the terminal
         if (control_unit.wait_for(std::chrono::milliseconds(10)) ==
@@ -86,8 +102,6 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
-}
-
 ```
 
 
