@@ -8,7 +8,6 @@
 
 class RtmpStreamer {
    public:
-    GstBus *bus;
 
     /**
      * @brief Default constructor for the RtmpStreamer class.
@@ -29,7 +28,7 @@ class RtmpStreamer {
     RtmpStreamer &operator=(const RtmpStreamer &) = delete;
     ~RtmpStreamer();
 
-    bool send_frame(cv::Mat frame);
+    bool send_frame(cv::Mat &frame);
     bool send_frame(uint8_t *frame, size_t size);
 
     void start_stream();
@@ -126,5 +125,5 @@ class RtmpStreamer {
 
     gint appsrc_need_data_id;
     gint appsrc_enough_data_id;
-
+    GstBus *bus;
 };

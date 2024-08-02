@@ -2,6 +2,7 @@
 
 #include <fmt/core.h>
 
+#include <iostream>
 #include <mutex>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/videoio.hpp>
@@ -16,7 +17,11 @@ void RtmpStreamer::async_streamer_control_unit() {
     std::getline(std::cin, command);
 
     do {
-        if (std::strcmp(command.c_str(), "stop_rtmp_stream") == 0) {
+        if (std::strcmp(command.c_str(), "start_stream") == 0) {
+            start_stream();
+        } else if (std::strcmp(command.c_str(), "stop_stream") == 0) {
+            stop_stream();
+        } else if (std::strcmp(command.c_str(), "stop_rtmp_stream") == 0) {
             stop_rtmp_stream();
         } else if (std::strcmp(command.c_str(), "stop_local_stream") == 0) {
             stop_local_stream();
@@ -73,12 +78,10 @@ RtmpStreamer::~RtmpStreamer() {
 
 void RtmpStreamer::start_stream() {
     if (appsrc_need_data_id == 0) {
-        gst_println("need-data setup");
         appsrc_need_data_id = g_signal_connect(
             appsrc, "need-data", G_CALLBACK(cb_need_data), &want_data);
     }
     if (appsrc_enough_data_id == 0) {
-        gst_println("enough-data setup");
         appsrc_enough_data_id = g_signal_connect(
             appsrc, "enough-data", G_CALLBACK(cb_enough_data), &want_data);
     }
@@ -118,8 +121,8 @@ bool RtmpStreamer::send_frame_to_appsrc(void *data, size_t size) {
         GstClockTime running_time = current_time - base_time;
         GstClockTime timestamp = running_time;
 
-        // Set the PTS (presentation timestamp) and DTS (decoding timestamp) of
-        // the buffer
+        // Set the PTS (presentation timestamp) and DTS (decoding timestamp)
+        // of the buffer
         GST_BUFFER_PTS(buffer) = timestamp;
         GST_BUFFER_DTS(buffer) = timestamp;
         GST_BUFFER_DURATION(buffer) =
@@ -153,8 +156,6 @@ bool RtmpStreamer::send_frame_to_appsrc(void *data, size_t size) {
         return FALSE;
     }
 
-    std::cout << "sent frame\n";
-
     return TRUE;
 }
 
@@ -177,15 +178,13 @@ bool RtmpStreamer::send_frame(unsigned char *frame, size_t size) {
     return send_frame_to_appsrc((void *)frame, size);
 }
 
-bool RtmpStreamer::send_frame(cv::Mat frame) {
+bool RtmpStreamer::send_frame(cv::Mat &frame) {
     if (frame.empty()) {
         g_printerr("Captured frame is empty.\n");
         return FALSE;
     }
-    std::cout << "1\n";
 
     std::lock_guard<std::mutex> guard(handling_pipeline);
-    std::cout << "2\n";
 
     want_data_muxex.lock();
     if (!want_data) {
@@ -194,26 +193,23 @@ bool RtmpStreamer::send_frame(cv::Mat frame) {
         return FALSE;
     }
     want_data_muxex.unlock();
-    std::cout << "3\n";
 
     // Ensure the frame is in RGB format
+    cv::Mat temp_frame(screen_height, screen_width, CV_8UC1);
     if (frame.channels() == 4) {
-        cv::cvtColor(frame, frame, cv::COLOR_BGRA2RGB);
-        std::cout << "4\n";
+        cv::cvtColor(frame, temp_frame, cv::COLOR_BGRA2RGB);
     } else if (frame.channels() == 3) {
-        cv::cvtColor(frame, frame, cv::COLOR_BGR2RGB);
-        std::cout << "4\n";
+        cv::cvtColor(frame, temp_frame, cv::COLOR_BGR2RGB);
     } else {
         g_printerr("Captured frame is not in a supported format.\n");
         return FALSE;
     }
 
-    std::cout << "5\n";
-    if (!send_frame_to_appsrc((void *)frame.data, frame.total() * frame.elemSize())) {
+    if (!send_frame_to_appsrc((void *)frame.data,
+                              frame.total() * frame.elemSize())) {
         return FALSE;
     }
 
-    std::cout << "5\n";
     return TRUE;
 }
 
@@ -230,10 +226,10 @@ void RtmpStreamer::initialize_streamer() {
     auto source_setup_string = fmt::format(
         "appsrc name=appsrc is-live=true block=false "
         "format=GST_FORMAT_TIME "
-        "caps=video/x-raw,format=RGB,framerate=60/1,width={},height={} "
+        "caps=video/x-raw,format=RGB,framerate=30/1,width={},height={} "
         "! videoconvert name=videoconvert ! videoscale name=videoscale ! "
         "videorate name=videorate ! "
-        "video/x-raw,framerate=30/1,width=512,height=512 ! tee name=tee",
+        "video/x-raw,framerate=30/1 ! tee name=tee",
         screen_width, screen_height);
 
     source_bin = gst_parse_bin_from_description(source_setup_string.c_str(),
@@ -242,8 +238,8 @@ void RtmpStreamer::initialize_streamer() {
     source_bin_name = gst_element_get_name(source_bin);
 
     rtmp_bin = gst_parse_bin_from_description(
-        "x264enc name=x264_encoder tune=zerolatency speed-preset=superfast "
-        "bitrate=2500 ! "
+        "x264enc name=x264_encoder tune=zerolatency speed-preset=ultrafast "
+        "bitrate=3000 ! "
         "queue name=rtmp_queue ! flvmux name=flvmux streamable=true ! "
         "rtmpsink "
         "name=rtmp_sink"
@@ -277,9 +273,11 @@ void RtmpStreamer::initialize_streamer() {
     // src_local_tee_pad = gst_element_request_pad_simple(tee, "src_%u");
 
     // gst_element_add_pad(source_bin,
-    //                     gst_ghost_pad_new("tee_rtmp_src", src_rtmp_tee_pad));
+    //                     gst_ghost_pad_new("tee_rtmp_src",
+    //                     src_rtmp_tee_pad));
     // gst_element_add_pad(
-    //     source_bin, gst_ghost_pad_new("local_video_src", src_local_tee_pad));
+    //     source_bin, gst_ghost_pad_new("local_video_src",
+    //     src_local_tee_pad));
 
     // GstPad *source_bin_rtmp =
     //     gst_element_get_static_pad(source_bin, "tee_rtmp_src");
@@ -368,7 +366,6 @@ void RtmpStreamer::start_rtmp_stream() {
         g_object_unref(bin);
         return;
     }
-    gst_print("hello");
     if (!connect_sink_bin_to_source_bin(source_bin, rtmp_bin, &src_rtmp_tee_pad,
                                         "tee", "tee_rtmp_src")) {
         exit(1);
@@ -522,7 +519,6 @@ bool RtmpStreamer::disconnect_sink_bin_from_source_bin(
 bool RtmpStreamer::connect_sink_bin_to_source_bin(
     GstElement *source_bin, GstElement *sink_bin, GstPad **request_pad,
     const char *tee_element_name, const char *tee_ghost_pad_name) {
-    gst_print("Hello\n");
     if (!source_bin || !sink_bin) {
         gst_printerr("Invalid source- or sink-bin, \n");
         return false;
@@ -581,7 +577,6 @@ bool RtmpStreamer::connect_sink_bin_to_source_bin(
     }
 
     gst_element_set_state(sink_bin, GST_STATE_PLAYING);
-    gst_print("Hello\n");
 
     // Unref objects
     gst_object_unref(src_ghost_pad);
@@ -680,8 +675,8 @@ bool RtmpStreamer::check_error() const {
             default:
                 g_print("Error: Unknown message type");
                 exit(1);
-                // We should not reach here because we only asked for ERRORs and
-                // EOS
+                // We should not reach here because we only asked for ERRORs
+                // and EOS
                 break;
         }
         gst_message_unref(msg);
