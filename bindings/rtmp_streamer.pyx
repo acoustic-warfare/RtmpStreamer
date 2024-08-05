@@ -15,10 +15,10 @@ cdef class PyRtmpStreamer:
     cdef unsigned int width
     cdef unsigned int height
 
-    def __cinit__(self, width: int, height: int):
+    def __cinit__(self, width: int, height: int, rtmp_streaming_addr="rtmp://ome.waraps.org/app/unnamed"):
         self.width = width
         self.height = height
-        self.c_obj = new RtmpStreamer(self.width, self.height)
+        self.c_obj = new RtmpStreamer(self.width, self.height, rtmp_streaming_addr)
 
     def __dealloc__(self):
         del self.c_obj

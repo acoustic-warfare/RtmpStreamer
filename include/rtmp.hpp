@@ -4,6 +4,7 @@
 #include <mutex>
 #include <opencv2/core/mat.hpp>
 #include <opencv2/opencv.hpp>
+#include <string>
 
 class RtmpStreamer {
    public:
@@ -11,7 +12,8 @@ class RtmpStreamer {
      * @brief Default constructor for the RtmpStreamer class.
      *
      * The `RtmpStreamer` constructor initializes the streamer with default
-     * screen resolution of 1024x1024.
+     * screen resolution of 1024x1024. Default RTMP server is
+     * 'rtmp://ome.waraps.org/app/unnamed'.
      */
     RtmpStreamer();
 
@@ -20,8 +22,9 @@ class RtmpStreamer {
      *
      * @param width The width of the stream.
      * @param height The height of the stream.
+     * @param rtmp_streaming_addr The address of the RTMP server to stream to
      */
-    RtmpStreamer(uint width, uint height);
+    RtmpStreamer(uint width, uint height, const char *rtmp_streaming_addr);
 
     /**
      * @brief Deleted copy constructor to prevent copying of RtmpStreamer
@@ -221,4 +224,5 @@ class RtmpStreamer {
     gint appsrc_need_data_id;
     gint appsrc_enough_data_id;
     GstBus *bus;
+   std::string rtmp_streaming_addr;
 };

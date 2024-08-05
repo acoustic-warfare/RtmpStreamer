@@ -8,47 +8,11 @@
 #include <opencv2/videoio.hpp>
 #include <string>
 
+#include "gst/gstobject.h"
+
 #define RGB_BYTES 3
 std::mutex RtmpStreamer::want_data_muxex = std::mutex();
 std::mutex RtmpStreamer::handling_pipeline = std::mutex();
-
-void RtmpStreamer::async_streamer_control_unit() {
-    std::string command;
-    std::getline(std::cin, command);
-
-    do {
-        if (std::strcmp(command.c_str(), "start_stream") == 0) {
-            start_stream();
-        } else if (std::strcmp(command.c_str(), "stop_stream") == 0) {
-            stop_stream();
-        } else if (std::strcmp(command.c_str(), "stop_rtmp_stream") == 0) {
-            stop_rtmp_stream();
-        } else if (std::strcmp(command.c_str(), "stop_local_stream") == 0) {
-            stop_local_stream();
-        } else if (std::strcmp(command.c_str(), "start_rtmp_stream") == 0) {
-            start_rtmp_stream();
-        } else if (std::strcmp(command.c_str(), "start_local_stream") == 0) {
-            start_local_stream();
-        } else if (std::strcmp(command.c_str(), "quit") == 0) {
-            break;
-        } else {
-            gst_printerr("\nInvalid command.\n");
-        }
-    } while (std::getline(std::cin, command));
-}
-
-void RtmpStreamer::cb_need_data(GstAppSrc *appsrc, guint size,
-                                gpointer user_data) {
-    std::lock_guard<std::mutex> guard(want_data_muxex);
-    bool *want_data = (bool *)user_data;
-    *want_data = true;
-}
-
-void RtmpStreamer::cb_enough_data(GstAppSrc *appsrc, gpointer user_data) {
-    std::lock_guard<std::mutex> guard(want_data_muxex);
-    bool *want_data = (bool *)user_data;
-    *want_data = false;
-}
 
 RtmpStreamer::RtmpStreamer()
     : screen_width(1024),
@@ -56,24 +20,34 @@ RtmpStreamer::RtmpStreamer()
       want_data(false),
       connected_bins_to_source(0),
       appsrc_need_data_id(0),
-      appsrc_enough_data_id(0) {
+      appsrc_enough_data_id(0),
+      rtmp_streaming_addr("rtmp://ome.waraps.org/app/unnamed") {
     initialize_streamer();
 }
 
-RtmpStreamer::RtmpStreamer(uint width, uint height)
+RtmpStreamer::RtmpStreamer(uint width, uint height,
+                           const char *rtmp_streaming_addr)
     : screen_width(width),
       screen_height(height),
       want_data(false),
       connected_bins_to_source(0),
       appsrc_need_data_id(0),
-      appsrc_enough_data_id(0) {
+      appsrc_enough_data_id(0),
+      rtmp_streaming_addr(rtmp_streaming_addr) {
     initialize_streamer();
 }
 
 RtmpStreamer::~RtmpStreamer() {
-    g_print("set to null.\n");
     gst_element_set_state(pipeline, GST_STATE_NULL);
     gst_object_unref(pipeline);
+    if (rtmp_bin) {
+        gst_object_unref(rtmp_bin);
+        rtmp_bin = nullptr;
+    }
+    if (local_video_bin) {
+        gst_object_unref(local_video_bin);
+        local_video_bin = nullptr;
+    }
 }
 
 void RtmpStreamer::start_stream() {
@@ -233,7 +207,8 @@ void RtmpStreamer::initialize_streamer() {
         "caps=video/x-raw,format={},framerate={}/1,width={},height={} "
         "! videoconvert name=videoconvert ! videoscale name=videoscale ! "
         "videorate name=videorate ! video/x-raw,framerate={}/1 ! tee name=tee",
-        color_format, frame_rate_in, screen_width, screen_height, frame_rate_out);
+        color_format, frame_rate_in, screen_width, screen_height,
+        frame_rate_out);
 
     source_bin = gst_parse_bin_from_description(source_setup_string.c_str(),
                                                 false, nullptr);
@@ -242,13 +217,12 @@ void RtmpStreamer::initialize_streamer() {
     // TODO: add functionality to change the default values
     int bitrate = 3500;
     std::string speed_preset = "ultrafast";
-    std::string rtmp_server_addr = "rtmp://ome.waraps.org/app/beamforming";
 
     auto rtmp_format_string = fmt::format(
         "x264enc name=x264_encoder tune=zerolatency speed-preset={} bitrate={} "
         "! queue name=rtmp_queue ! flvmux name=flvmux streamable=true "
         "! rtmpsink name=rtmp_sink location={}",
-        speed_preset, bitrate, rtmp_server_addr);
+        speed_preset, bitrate, rtmp_streaming_addr);
 
     rtmp_bin = gst_parse_bin_from_description(rtmp_format_string.c_str(), true,
                                               nullptr);
@@ -671,4 +645,42 @@ bool RtmpStreamer::check_error() const {
     }
 
     return false;
+}
+
+void RtmpStreamer::cb_need_data(GstAppSrc *appsrc, guint size,
+                                gpointer user_data) {
+    std::lock_guard<std::mutex> guard(want_data_muxex);
+    bool *want_data = (bool *)user_data;
+    *want_data = true;
+}
+
+void RtmpStreamer::cb_enough_data(GstAppSrc *appsrc, gpointer user_data) {
+    std::lock_guard<std::mutex> guard(want_data_muxex);
+    bool *want_data = (bool *)user_data;
+    *want_data = false;
+}
+
+void RtmpStreamer::async_streamer_control_unit() {
+    std::string command;
+    std::getline(std::cin, command);
+
+    do {
+        if (std::strcmp(command.c_str(), "start_stream") == 0) {
+            start_stream();
+        } else if (std::strcmp(command.c_str(), "stop_stream") == 0) {
+            stop_stream();
+        } else if (std::strcmp(command.c_str(), "stop_rtmp_stream") == 0) {
+            stop_rtmp_stream();
+        } else if (std::strcmp(command.c_str(), "stop_local_stream") == 0) {
+            stop_local_stream();
+        } else if (std::strcmp(command.c_str(), "start_rtmp_stream") == 0) {
+            start_rtmp_stream();
+        } else if (std::strcmp(command.c_str(), "start_local_stream") == 0) {
+            start_local_stream();
+        } else if (std::strcmp(command.c_str(), "quit") == 0) {
+            break;
+        } else {
+            gst_printerr("\nInvalid command.\n");
+        }
+    } while (std::getline(std::cin, command));
 }
