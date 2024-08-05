@@ -78,7 +78,7 @@ sudo ninja -C build install
 ```
 
 ### Configure dynamic linker
-Before the library can be used by other executables and libraries, it must be exposed to the dynamic linker. run `sudo ldconfig` to configure the dynamic linker.
+Before the library can be used by other executables and libraries, it must be exposed to the dynamic linker. run `ldconfig` to configure the dynamic linker.
 
 # Running Tests
 *yet to be implemented*
@@ -139,21 +139,19 @@ Python example with commens
 ```python
 from rtmp_streamer import PyRtmpStreamer
 import numpy as np
-import time
 
-SCREEN_WIDTH = 1920
-SCREEN_HEIGHT = 1080
+SCREEN_WIDTH = 1000
+SCREEN_HEIGHT = 1000
 
 if __name__ == "__main__":
     # Initialize the streamer with a with and a height for the video input
     streamer = PyRtmpStreamer(SCREEN_WIDTH, SCREEN_HEIGHT)
 
     # Only start the rtmp stream
-    streamer.start_stream()
+    streamer.start_rtmp_stream()
 
     # create a frame to display
     frame = np.zeros((SCREEN_HEIGHT,SCREEN_WIDTH, 3))
     while True:
         streamer.send_frame(frame.tobytes())
-        time.sleep(1000//30)
 ```
