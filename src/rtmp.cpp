@@ -223,33 +223,39 @@ void RtmpStreamer::initialize_streamer() {
         exit(1);
     }
 
+    // TODO: add functionality to change the default values
+    std::string color_format = "RGB";
+    int frame_rate_in = 30;
+    int frame_rate_out = 30;
+
     auto source_setup_string = fmt::format(
-        "appsrc name=appsrc is-live=true block=false "
-        "format=GST_FORMAT_TIME "
-        "caps=video/x-raw,format=RGB,framerate=30/1,width={},height={} "
+        "appsrc name=appsrc is-live=true block=true format=GST_FORMAT_TIME "
+        "caps=video/x-raw,format={},framerate={}/1,width={},height={} "
         "! videoconvert name=videoconvert ! videoscale name=videoscale ! "
-        "videorate name=videorate ! "
-        "video/x-raw,framerate=30/1 ! tee name=tee",
-        screen_width, screen_height);
+        "videorate name=videorate ! video/x-raw,framerate={}/1 ! tee name=tee",
+        color_format, frame_rate_in, screen_width, screen_height, frame_rate_out);
 
     source_bin = gst_parse_bin_from_description(source_setup_string.c_str(),
                                                 false, nullptr);
-
     source_bin_name = gst_element_get_name(source_bin);
 
-    rtmp_bin = gst_parse_bin_from_description(
-        "x264enc name=x264_encoder tune=zerolatency speed-preset=ultrafast "
-        "bitrate=3000 ! "
-        "queue name=rtmp_queue ! flvmux name=flvmux streamable=true ! "
-        "rtmpsink "
-        "name=rtmp_sink"
-        " location=rtmp://ome.waraps.org/app/beamforming",
-        true, nullptr);
+    // TODO: add functionality to change the default values
+    int bitrate = 3500;
+    std::string speed_preset = "ultrafast";
+    std::string rtmp_server_addr = "rtmp://ome.waraps.org/app/beamforming";
+
+    auto rtmp_format_string = fmt::format(
+        "x264enc name=x264_encoder tune=zerolatency speed-preset={} bitrate={} "
+        "! queue name=rtmp_queue ! flvmux name=flvmux streamable=true "
+        "! rtmpsink name=rtmp_sink location={}",
+        speed_preset, bitrate, rtmp_server_addr);
+
+    rtmp_bin = gst_parse_bin_from_description(rtmp_format_string.c_str(), true,
+                                              nullptr);
     rtmp_bin_name = gst_element_get_name(rtmp_bin);
 
     local_video_bin = gst_parse_bin_from_description(
-        "queue name=local_video_queue ! autovideosink "
-        "name=local_video_sink",
+        "queue name=local_video_queue ! autovideosink name=local_video_sink",
         true, nullptr);
     local_video_bin_name = gst_element_get_name(local_video_bin);
 
@@ -259,65 +265,12 @@ void RtmpStreamer::initialize_streamer() {
     }
 
     gst_bin_add(GST_BIN(pipeline), source_bin);
-    // gst_bin_add_many(GST_BIN(pipeline), source_bin, rtmp_bin,
-    // local_video_bin,
-    //                 NULL);
-
-    // GstElement *tee = gst_bin_get_by_name(GST_BIN(source_bin), "tee");
-    // if (!tee) {
-    //     gst_printerrln("Unable to retreive tee element.");
-    //     exit(1);
-    // }
-
-    // src_rtmp_tee_pad = gst_element_request_pad_simple(tee, "src_%u");
-    // src_local_tee_pad = gst_element_request_pad_simple(tee, "src_%u");
-
-    // gst_element_add_pad(source_bin,
-    //                     gst_ghost_pad_new("tee_rtmp_src",
-    //                     src_rtmp_tee_pad));
-    // gst_element_add_pad(
-    //     source_bin, gst_ghost_pad_new("local_video_src",
-    //     src_local_tee_pad));
-
-    // GstPad *source_bin_rtmp =
-    //     gst_element_get_static_pad(source_bin, "tee_rtmp_src");
-    // GstPad *rtmp_sink_pad = gst_element_get_static_pad(rtmp_bin, "sink");
-    // GstPadLinkReturn rtmp_link_result =
-    //     gst_pad_link(source_bin_rtmp, rtmp_sink_pad);
-    // if (rtmp_link_result != GST_PAD_LINK_OK) {
-    //     gst_printerrln(
-    //         "Unable to link request-pads to video and rtmp bins. rtmp "
-    //         "result: %d.",
-    //         rtmp_link_result);
-    //     exit(1);
-    // }
-
-    // GstPad *source_bin_video =
-    //     gst_element_get_static_pad(source_bin, "local_video_src");
-    // GstPad *local_video_sink_pad =
-    //     gst_element_get_static_pad(local_video_bin, "sink");
-    // GstPadLinkReturn video_link_result =
-    //     gst_pad_link(source_bin_video, local_video_sink_pad);
-    //
-    // if (video_link_result != GST_PAD_LINK_OK) {
-    //     gst_printerrln(
-    //         "Unable to link request-pads to video and rtmp bins.video "
-    //         "result: %d.",
-    //         video_link_result);
-    //     exit(1);
-    // }
 
     appsrc = gst_bin_get_by_name(GST_BIN(source_bin), "appsrc");
     if (!appsrc) {
         gst_printerr("error extracting appsrc\n");
         exit(1);
     }
-
-    // gst_object_unref(source_bin_rtmp);
-    // gst_object_unref(source_bin_video);
-    // gst_object_unref(rtmp_sink_pad);
-    // gst_object_unref(local_video_sink_pad);
-    // gst_object_unref(tee);
 }
 
 [[maybe_unused]] static void set_element_state_to_parent_state(
