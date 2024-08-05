@@ -36,7 +36,7 @@ cython_extension = py.extension_module(
   dependencies: pyx_dependencies,
   include_directories: pyx_include_dirs,
   cython_args: cython_args,
-  link_with: libdynrt,
+  link_with: librtmp_streamer,
   override_options: ['cython_language=cpp'],
   cpp_args: ['-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION'],
   install: true,

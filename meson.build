@@ -27,8 +27,8 @@ fmt_dep = dependency('fmt', required: true)
 # library object
 # ----------------------------------------- #
 #
-libdynrt = library(
-  'DynRT',
+librtmp_streamer = library(
+  'rtmp-streamer',
   sources: cpp_files,
   dependencies: [
     gstreamer_dep,
@@ -55,10 +55,10 @@ install_headers('include/rtmp.hpp', subdir: 'DynRT')
 # Install pkg-config file
 pkg_config = import('pkgconfig')
 pkg_config.generate(
-  name: 'dynrt',
+  name: 'rtmp-streamer',
   description: 'Dynamic Real-Time library',
-  filebase: 'dynrt',
-  libraries: libdynrt,
+  filebase: 'rtmp-streamer',
+  libraries: librtmp_streamer,
   version: '0.1.0',
   subdirs: 'include',
   requires: ['gstreamer-1.0', 'opencv4'],
