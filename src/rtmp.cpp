@@ -366,6 +366,15 @@ void RtmpStreamer::start_rtmp_stream() {
         g_object_unref(bin);
         return;
     }
+    if (appsrc_need_data_id == 0) {
+        appsrc_need_data_id = g_signal_connect(
+            appsrc, "need-data", G_CALLBACK(cb_need_data), &want_data);
+    }
+    if (appsrc_enough_data_id == 0) {
+        appsrc_enough_data_id = g_signal_connect(
+            appsrc, "enough-data", G_CALLBACK(cb_enough_data), &want_data);
+    }
+
     if (!connect_sink_bin_to_source_bin(source_bin, rtmp_bin, &src_rtmp_tee_pad,
                                         "tee", "tee_rtmp_src")) {
         exit(1);
@@ -386,6 +395,14 @@ void RtmpStreamer::stop_rtmp_stream() {
     connected_bins_to_source -= 1;
     if (connected_bins_to_source == 0) {
         gst_element_set_state(pipeline, GST_STATE_NULL);
+        if (appsrc_need_data_id != 0) {
+            g_signal_handler_disconnect(appsrc, appsrc_need_data_id);
+            appsrc_need_data_id = 0;
+        }
+        if (appsrc_enough_data_id != 0) {
+            g_signal_handler_disconnect(appsrc, appsrc_enough_data_id);
+            appsrc_enough_data_id = 0;
+        }
     }
     if (!disconnect_sink_bin_from_source_bin(
             source_bin, rtmp_bin, src_rtmp_tee_pad, "tee_rtmp_src")) {
@@ -401,6 +418,15 @@ void RtmpStreamer::start_local_stream() {
         gst_print("local bin already connected\n");
         g_object_unref(bin);
         return;
+    }
+
+    if (appsrc_need_data_id == 0) {
+        appsrc_need_data_id = g_signal_connect(
+            appsrc, "need-data", G_CALLBACK(cb_need_data), &want_data);
+    }
+    if (appsrc_enough_data_id == 0) {
+        appsrc_enough_data_id = g_signal_connect(
+            appsrc, "enough-data", G_CALLBACK(cb_enough_data), &want_data);
     }
     if (!connect_sink_bin_to_source_bin(source_bin, local_video_bin,
                                         &src_local_tee_pad, "tee",
@@ -425,7 +451,16 @@ void RtmpStreamer::stop_local_stream() {
     connected_bins_to_source -= 1;
     if (connected_bins_to_source == 0) {
         gst_element_set_state(pipeline, GST_STATE_NULL);
+        if (appsrc_need_data_id != 0) {
+            g_signal_handler_disconnect(appsrc, appsrc_need_data_id);
+            appsrc_need_data_id = 0;
+        }
+        if (appsrc_enough_data_id != 0) {
+            g_signal_handler_disconnect(appsrc, appsrc_enough_data_id);
+            appsrc_enough_data_id = 0;
+        }
     }
+
     if (!disconnect_sink_bin_from_source_bin(source_bin, local_video_bin,
                                              src_local_tee_pad,
                                              "local_video_src")) {

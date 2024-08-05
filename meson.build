@@ -41,16 +41,8 @@ librtmp_streamer = library(
   install: true, # Mark the shared library for installation
 )
 
-if get_option('python-bindings')
-  subdir('bindings')
-endif
-
-if get_option('build-examples')
-  subdir('examples')
-endif
-
 # install headers
-install_headers('include/rtmp.hpp', subdir: 'DynRT')
+install_headers('include/rtmp.hpp', subdir: 'rtmp-streamer')
 
 # Install pkg-config file
 pkg_config = import('pkgconfig')
@@ -63,3 +55,11 @@ pkg_config.generate(
   subdirs: 'include',
   requires: ['gstreamer-1.0', 'opencv4'],
 )
+
+if get_option('python-bindings')
+  subdir('bindings')
+endif
+
+if get_option('build-examples')
+  subdir('examples')
+endif
