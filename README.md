@@ -78,7 +78,7 @@ sudo ninja -C build install
 ```
 
 ### Configure dynamic linker
-Before the library can be used by other executables and libraries, it must be exposed to the dynamic linker. run `ldconfig` to configure the dynamic linker.
+Before the library can be used by other executables and libraries, it must be exposed to the dynamic linker. run `sudo ldconfig` to configure the dynamic linker.
 
 # Running Tests
 *yet to be implemented*
@@ -135,7 +135,7 @@ int main(int argc, char *argv[]) {
 ```
 
 
-Python example with comments:
+Python example with commens
 ```python
 from rtmp_streamer import PyRtmpStreamer
 import numpy as np
