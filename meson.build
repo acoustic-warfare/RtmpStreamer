@@ -45,6 +45,10 @@ if get_option('python-bindings')
   subdir('bindings')
 endif
 
+if get_option('build-examples')
+  subdir('examples')
+endif
+
 # install headers
 install_headers('include/rtmp.hpp', subdir: 'DynRT')
 

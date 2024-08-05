@@ -6,7 +6,7 @@
 dependencies = [dependency('dynrt'), opencv_dep]
 
 # Executable
-test_exe = executable(
+executable(
   'example_cpp',
   sources: ['example.cpp'],
   dependencies: dependencies,
