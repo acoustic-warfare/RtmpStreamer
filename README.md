@@ -98,8 +98,10 @@ Before the library can be used by other executables and libraries, it must be ex
 typedef cv::Point3_<uint8_t> Pixel;
 
 int main(int argc, char *argv[]) {
-    // Initialize the Streamer with a width of 1920 and height of 1080.
-    RtmpStreamer streamer(SCREEN_WIDTH, SCREEN_HEIGHT);
+    // Initialize the Streamer with a width of 1920 and height of 1080 and
+    // determine where to send the RTMP stream to
+    RtmpStreamer streamer(SCREEN_WIDTH, SCREEN_HEIGHT,
+                          "rtmp://ome.waraps.org/app/stream-name");
     streamer.start_stream();
 
     // Generate a frame and colormap it
@@ -144,8 +146,10 @@ SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 1000
 
 if __name__ == "__main__":
-    # Initialize the streamer with a with and a height for the video input
-    streamer = PyRtmpStreamer(SCREEN_WIDTH, SCREEN_HEIGHT)
+    # Initialize the streamer with a with and a height for the video input 
+    # and the Server to stream to
+    streamer = PyRtmpStreamer(SCREEN_WIDTH, SCREEN_HEIGHT, 
+                              "rtmp://ome.waraps.org/app/streamname")
 
     # Only start the rtmp stream
     streamer.start_rtmp_stream()

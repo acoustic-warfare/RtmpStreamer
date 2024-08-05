@@ -5,8 +5,9 @@ SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 1000
 
 if __name__ == "__main__":
-    # Initialize the streamer with a with and a height for the video input
-    streamer = PyRtmpStreamer(SCREEN_WIDTH, SCREEN_HEIGHT)
+    # Initialize the streamer with a with and a height for the video input 
+    # and the Server to stream to
+    streamer = PyRtmpStreamer(SCREEN_WIDTH, SCREEN_HEIGHT, "rtmp://ome.waraps.org/app/streamname")
 
     # Only start the rtmp stream
     streamer.start_rtmp_stream()
