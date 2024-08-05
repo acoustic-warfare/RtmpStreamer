@@ -1,5 +1,5 @@
 project(
-  'DynRT',
+  'Dynamic Rtmp Streamer',
   'cpp',
   'cython',
   version: '0.1.0',
