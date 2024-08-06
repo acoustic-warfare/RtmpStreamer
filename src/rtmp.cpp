@@ -74,6 +74,8 @@ void RtmpStreamer::stop_stream() {
         g_signal_handler_disconnect(appsrc, appsrc_enough_data_id);
         appsrc_enough_data_id = 0;
     }
+    want_data = false;
+
     stop_rtmp_stream();
     stop_local_stream();
     gst_element_set_state(pipeline, GST_STATE_NULL);
@@ -221,7 +223,7 @@ void RtmpStreamer::initialize_streamer() {
     auto rtmp_format_string = fmt::format(
         "x264enc name=x264_encoder tune=zerolatency speed-preset={} bitrate={} "
         "! queue name=rtmp_queue ! flvmux name=flvmux streamable=true "
-        "! rtmpsink name=rtmp_sink location={}",
+        "! rtmp2sink name=rtmp_sink location={}",
         speed_preset, bitrate, rtmp_streaming_addr);
 
     rtmp_bin = gst_parse_bin_from_description(rtmp_format_string.c_str(), true,
@@ -330,7 +332,9 @@ void RtmpStreamer::stop_rtmp_stream() {
             g_signal_handler_disconnect(appsrc, appsrc_enough_data_id);
             appsrc_enough_data_id = 0;
         }
+        want_data = false;
     }
+    
     if (!disconnect_sink_bin_from_source_bin(
             source_bin, rtmp_bin, src_rtmp_tee_pad, "tee_rtmp_src")) {
         exit(1);
@@ -386,6 +390,7 @@ void RtmpStreamer::stop_local_stream() {
             g_signal_handler_disconnect(appsrc, appsrc_enough_data_id);
             appsrc_enough_data_id = 0;
         }
+        want_data = false;
     }
 
     if (!disconnect_sink_bin_from_source_bin(source_bin, local_video_bin,

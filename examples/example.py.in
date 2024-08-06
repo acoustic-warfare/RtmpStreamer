@@ -11,6 +11,8 @@ if __name__ == "__main__":
 
     # Only start the rtmp stream
     streamer.start_rtmp_stream()
+    streamer.stop_rtmp_stream()
+    streamer.start_rtmp_stream()
 
     # create a frame to display
     frame = np.zeros((SCREEN_HEIGHT,SCREEN_WIDTH, 3))
