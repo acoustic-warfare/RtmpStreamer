@@ -51,14 +51,7 @@ RtmpStreamer::~RtmpStreamer() {
 }
 
 void RtmpStreamer::start_stream() {
-    if (appsrc_need_data_id == 0) {
-        appsrc_need_data_id = g_signal_connect(
-            appsrc, "need-data", G_CALLBACK(cb_need_data), &want_data);
-    }
-    if (appsrc_enough_data_id == 0) {
-        appsrc_enough_data_id = g_signal_connect(
-            appsrc, "enough-data", G_CALLBACK(cb_enough_data), &want_data);
-    }
+    connect_appsrc_signal_handler();
     start_rtmp_stream();
     start_local_stream();
     gst_element_set_state(pipeline, GST_STATE_PLAYING);
@@ -66,16 +59,7 @@ void RtmpStreamer::start_stream() {
 }
 
 void RtmpStreamer::stop_stream() {
-    if (appsrc_need_data_id != 0) {
-        g_signal_handler_disconnect(appsrc, appsrc_need_data_id);
-        appsrc_need_data_id = 0;
-    }
-    if (appsrc_enough_data_id != 0) {
-        g_signal_handler_disconnect(appsrc, appsrc_enough_data_id);
-        appsrc_enough_data_id = 0;
-    }
-    want_data = false;
-
+    disconnect_appsrc_signal_handler();
     stop_rtmp_stream();
     stop_local_stream();
     gst_element_set_state(pipeline, GST_STATE_NULL);
@@ -83,56 +67,84 @@ void RtmpStreamer::stop_stream() {
     bus = nullptr;
 }
 
-bool RtmpStreamer::send_frame_to_appsrc(void *data, size_t size) {
-    GstBuffer *buffer;
-    GstFlowReturn ret;
+void RtmpStreamer::start_rtmp_stream() {
+    GstElement *bin = gst_bin_get_by_name(GST_BIN(pipeline), rtmp_bin_name);
+    if (bin) {
+        gst_print("rtmp bin already connected\n");
+        g_object_unref(bin);
+        return;
+    }
+    connect_appsrc_signal_handler();
 
-    // Create a new buffer
-    buffer = gst_buffer_new_allocate(nullptr, size, nullptr);
+    if (!connect_sink_bin_to_source_bin(source_bin, rtmp_bin, &src_rtmp_tee_pad,
+                                        "tee", "tee_rtmp_src")) {
+        exit(1);
+    }
+    if (++connected_bins_to_source == 1) {
+        gst_element_set_state(pipeline, GST_STATE_PLAYING);
+    }
+}
 
-    GstClock *clock = gst_element_get_clock(appsrc);
-    if (clock) {
-        GstClockTime base_time = gst_element_get_base_time(appsrc);
-        GstClockTime current_time = gst_clock_get_time(clock);
-        GstClockTime running_time = current_time - base_time;
-        GstClockTime timestamp = running_time;
+void RtmpStreamer::stop_rtmp_stream() {
+    GstElement *bin = gst_bin_get_by_name(GST_BIN(pipeline), rtmp_bin_name);
+    if (!bin) {
+        gst_print("rtmp bin already disconnected\n");
+        return;
+    }
+    g_object_unref(bin);
+    if (--connected_bins_to_source == 0) {
+        gst_element_set_state(pipeline, GST_STATE_NULL);
+        disconnect_appsrc_signal_handler();
+    }
 
-        // Set the PTS (presentation timestamp) and DTS (decoding timestamp)
-        // of the buffer
-        GST_BUFFER_PTS(buffer) = timestamp;
-        GST_BUFFER_DTS(buffer) = timestamp;
-        GST_BUFFER_DURATION(buffer) =
-            (GstClockTime)gst_util_uint64_scale_int(GST_SECOND, 1, 30);
-        gst_object_unref(clock);
-    } else {
-        gst_printerr("unable to open clock for appsrc!\n");
+    if (!disconnect_sink_bin_from_source_bin(
+            source_bin, rtmp_bin, src_rtmp_tee_pad, "tee_rtmp_src")) {
+        exit(1);
+    }
+    src_rtmp_tee_pad = nullptr;
+}
+
+void RtmpStreamer::start_local_stream() {
+    GstElement *bin =
+        gst_bin_get_by_name(GST_BIN(pipeline), local_video_bin_name);
+    if (bin) {
+        gst_print("local bin already connected\n");
+        g_object_unref(bin);
+        return;
+    }
+    connect_appsrc_signal_handler();
+
+    if (!connect_sink_bin_to_source_bin(source_bin, local_video_bin,
+                                        &src_local_tee_pad, "tee",
+                                        "local_video_src")) {
         exit(1);
     }
 
-    if (!GST_BUFFER_DURATION_IS_VALID(buffer)) {
-        gst_printerr("Invalid buffer duration.!\n");
+    if (++connected_bins_to_source == 1) {
+        gst_element_set_state(pipeline, GST_STATE_PLAYING);
+    }
+}
+
+void RtmpStreamer::stop_local_stream() {
+    GstElement *bin =
+        gst_bin_get_by_name(GST_BIN(pipeline), local_video_bin_name);
+    if (!bin) {
+        gst_print("local bin already disconnected\n");
+        return;
+    }
+    g_object_unref(bin);
+    connected_bins_to_source -= 1;
+    if (connected_bins_to_source == 0) {
+        gst_element_set_state(pipeline, GST_STATE_NULL);
+        disconnect_appsrc_signal_handler();
+    }
+
+    if (!disconnect_sink_bin_from_source_bin(source_bin, local_video_bin,
+                                             src_local_tee_pad,
+                                             "local_video_src")) {
         exit(1);
     }
-
-    // Copy the cv::Mat data into the GStreamer buffer
-    GstMapInfo map;
-    gst_buffer_map(buffer, &map, GST_MAP_WRITE);
-    memcpy(map.data, data, size);
-    gst_buffer_unmap(buffer, &map);
-
-    // Push the buffer to appsrc
-    g_signal_emit_by_name(appsrc, "push-buffer", buffer, &ret);
-
-    // Free the buffer
-    gst_buffer_unref(buffer);
-
-    if (ret != GST_FLOW_OK) {
-        // We got some error, stop sending data
-        g_print("error when sending :(.\n");
-        return FALSE;
-    }
-
-    return TRUE;
+    src_local_tee_pad = nullptr;
 }
 
 bool RtmpStreamer::send_frame(unsigned char *frame, size_t size) {
@@ -187,6 +199,96 @@ bool RtmpStreamer::send_frame(cv::Mat &frame) {
     }
 
     return TRUE;
+}
+
+void RtmpStreamer::async_streamer_control_unit() {
+    std::string command;
+    std::getline(std::cin, command);
+
+    do {
+        if (std::strcmp(command.c_str(), "start_stream") == 0) {
+            start_stream();
+        } else if (std::strcmp(command.c_str(), "stop_stream") == 0) {
+            stop_stream();
+        } else if (std::strcmp(command.c_str(), "stop_rtmp_stream") == 0) {
+            stop_rtmp_stream();
+        } else if (std::strcmp(command.c_str(), "stop_local_stream") == 0) {
+            stop_local_stream();
+        } else if (std::strcmp(command.c_str(), "start_rtmp_stream") == 0) {
+            start_rtmp_stream();
+        } else if (std::strcmp(command.c_str(), "start_local_stream") == 0) {
+            start_local_stream();
+        } else if (std::strcmp(command.c_str(), "quit") == 0) {
+            break;
+        } else {
+            gst_printerr("\nInvalid command.\n");
+        }
+    } while (std::getline(std::cin, command));
+}
+
+void RtmpStreamer::debug_info() {
+    const char *possible_states[5] = {"Void Pending", "Null", "Ready", "Paused",
+                                      "Playing"};
+    gst_println(
+        "\n----------------- START DEBUG INFO "
+        "-----------------------\n");
+    gst_println("pipeline state: %s (pending state: %s)\n",
+                possible_states[pipeline->current_state],
+                possible_states[pipeline->pending_state]);
+    gchar *name;
+    GST_OBJECT_LOCK(pipeline);
+    GList *pipeline_children = GST_BIN(pipeline)->children;
+
+    while (pipeline_children) {
+        GstBin *bin = GST_BIN(pipeline_children->data);
+        gst_println("###### BIN: %s ######", gst_pad_get_name(bin));
+        gst_println("bin state: %s (pending state: %s)\n",
+                    possible_states[GST_ELEMENT(pipeline_children->data)
+                                        ->current_state],
+                    possible_states[GST_ELEMENT(pipeline_children->data)
+                                        ->pending_state]);
+
+        GList *pads = GST_ELEMENT(pipeline_children->data)->pads;
+        gst_println("--- Bin Pads ---");
+        while (pads) {
+            GstPad *pad = GST_PAD(pads->data);
+            name = gst_pad_get_name(pad);
+            gst_println("bin pad: %s (is linked: %s)", name,
+                        gst_pad_is_linked(pad) ? "true" : "false");
+            g_free(name);
+            pads = pads->next;
+        }
+
+        gst_println("\n--- Elements ---");
+        GList *elements = bin->children;
+        while (elements) {
+            GstElement *element = GST_ELEMENT(elements->data);
+            name = gst_element_get_name(element);
+            gst_println("element: %s", name);
+            g_free(name);
+            gst_println("- element state: %s (pending state: %s)",
+                        possible_states[element->current_state],
+                        possible_states[element->pending_state]);
+
+            GList *pads = element->pads;
+            gst_println("element pads:");
+            while (pads) {
+                GstPad *pad = GST_PAD(pads->data);
+                name = gst_pad_get_name(pad);
+                gst_println("- element pad: %s (is linked: %s)", name,
+                            gst_pad_is_linked(pad) ? "true" : "false");
+                g_free(name);
+
+                pads = pads->next;
+            }
+            elements = elements->next;
+            gst_print("\n");
+        }
+        pipeline_children = pipeline_children->next;
+        gst_print("\n");
+    }
+    GST_OBJECT_UNLOCK(pipeline);
+    gst_println("----------------- END DEBUG INFO -----------------------\n");
 }
 
 void RtmpStreamer::initialize_streamer() {
@@ -249,6 +351,58 @@ void RtmpStreamer::initialize_streamer() {
     }
 }
 
+bool RtmpStreamer::send_frame_to_appsrc(void *data, size_t size) {
+    GstBuffer *buffer;
+    GstFlowReturn ret;
+
+    // Create a new buffer
+    buffer = gst_buffer_new_allocate(nullptr, size, nullptr);
+
+    GstClock *clock = gst_element_get_clock(appsrc);
+    if (clock) {
+        GstClockTime base_time = gst_element_get_base_time(appsrc);
+        GstClockTime current_time = gst_clock_get_time(clock);
+        GstClockTime running_time = current_time - base_time;
+        GstClockTime timestamp = running_time;
+
+        // Set the PTS (presentation timestamp) and DTS (decoding timestamp)
+        // of the buffer
+        GST_BUFFER_PTS(buffer) = timestamp;
+        GST_BUFFER_DTS(buffer) = timestamp;
+        GST_BUFFER_DURATION(buffer) =
+            (GstClockTime)gst_util_uint64_scale_int(GST_SECOND, 1, 30);
+        gst_object_unref(clock);
+    } else {
+        gst_printerr("unable to open clock for appsrc!\n");
+        exit(1);
+    }
+
+    if (!GST_BUFFER_DURATION_IS_VALID(buffer)) {
+        gst_printerr("Invalid buffer duration.!\n");
+        exit(1);
+    }
+
+    // Copy the cv::Mat data into the GStreamer buffer
+    GstMapInfo map;
+    gst_buffer_map(buffer, &map, GST_MAP_WRITE);
+    memcpy(map.data, data, size);
+    gst_buffer_unmap(buffer, &map);
+
+    // Push the buffer to appsrc
+    g_signal_emit_by_name(appsrc, "push-buffer", buffer, &ret);
+
+    // Free the buffer
+    gst_buffer_unref(buffer);
+
+    if (ret != GST_FLOW_OK) {
+        // We got some error, stop sending data
+        g_print("error when sending :(.\n");
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
 [[maybe_unused]] static void set_element_state_to_parent_state(
     GstElement *element) {
     GstElement *parent;
@@ -286,119 +440,6 @@ void RtmpStreamer::initialize_streamer() {
 
     // Clean up
     gst_object_unref(parent);
-}
-
-void RtmpStreamer::start_rtmp_stream() {
-    GstElement *bin = gst_bin_get_by_name(GST_BIN(pipeline), rtmp_bin_name);
-    if (bin) {
-        gst_print("rtmp bin already connected\n");
-        g_object_unref(bin);
-        return;
-    }
-    if (appsrc_need_data_id == 0) {
-        appsrc_need_data_id = g_signal_connect(
-            appsrc, "need-data", G_CALLBACK(cb_need_data), &want_data);
-    }
-    if (appsrc_enough_data_id == 0) {
-        appsrc_enough_data_id = g_signal_connect(
-            appsrc, "enough-data", G_CALLBACK(cb_enough_data), &want_data);
-    }
-
-    if (!connect_sink_bin_to_source_bin(source_bin, rtmp_bin, &src_rtmp_tee_pad,
-                                        "tee", "tee_rtmp_src")) {
-        exit(1);
-    }
-    connected_bins_to_source += 1;
-    if (connected_bins_to_source == 1) {
-        gst_element_set_state(pipeline, GST_STATE_PLAYING);
-    }
-}
-
-void RtmpStreamer::stop_rtmp_stream() {
-    GstElement *bin = gst_bin_get_by_name(GST_BIN(pipeline), rtmp_bin_name);
-    if (!bin) {
-        gst_print("rtmp bin already disconnected\n");
-        return;
-    }
-    g_object_unref(bin);
-    connected_bins_to_source -= 1;
-    if (connected_bins_to_source == 0) {
-        gst_element_set_state(pipeline, GST_STATE_NULL);
-        if (appsrc_need_data_id != 0) {
-            g_signal_handler_disconnect(appsrc, appsrc_need_data_id);
-            appsrc_need_data_id = 0;
-        }
-        if (appsrc_enough_data_id != 0) {
-            g_signal_handler_disconnect(appsrc, appsrc_enough_data_id);
-            appsrc_enough_data_id = 0;
-        }
-        want_data = false;
-    }
-    
-    if (!disconnect_sink_bin_from_source_bin(
-            source_bin, rtmp_bin, src_rtmp_tee_pad, "tee_rtmp_src")) {
-        exit(1);
-    }
-    src_rtmp_tee_pad = nullptr;
-}
-
-void RtmpStreamer::start_local_stream() {
-    GstElement *bin =
-        gst_bin_get_by_name(GST_BIN(pipeline), local_video_bin_name);
-    if (bin) {
-        gst_print("local bin already connected\n");
-        g_object_unref(bin);
-        return;
-    }
-
-    if (appsrc_need_data_id == 0) {
-        appsrc_need_data_id = g_signal_connect(
-            appsrc, "need-data", G_CALLBACK(cb_need_data), &want_data);
-    }
-    if (appsrc_enough_data_id == 0) {
-        appsrc_enough_data_id = g_signal_connect(
-            appsrc, "enough-data", G_CALLBACK(cb_enough_data), &want_data);
-    }
-    if (!connect_sink_bin_to_source_bin(source_bin, local_video_bin,
-                                        &src_local_tee_pad, "tee",
-                                        "local_video_src")) {
-        exit(1);
-    }
-
-    connected_bins_to_source += 1;
-    if (connected_bins_to_source == 1) {
-        gst_element_set_state(pipeline, GST_STATE_PLAYING);
-    }
-}
-
-void RtmpStreamer::stop_local_stream() {
-    GstElement *bin =
-        gst_bin_get_by_name(GST_BIN(pipeline), local_video_bin_name);
-    if (!bin) {
-        gst_print("local bin already disconnected\n");
-        return;
-    }
-    g_object_unref(bin);
-    connected_bins_to_source -= 1;
-    if (connected_bins_to_source == 0) {
-        gst_element_set_state(pipeline, GST_STATE_NULL);
-        if (appsrc_need_data_id != 0) {
-            g_signal_handler_disconnect(appsrc, appsrc_need_data_id);
-            appsrc_need_data_id = 0;
-        }
-        if (appsrc_enough_data_id != 0) {
-            g_signal_handler_disconnect(appsrc, appsrc_enough_data_id);
-            appsrc_enough_data_id = 0;
-        }
-        want_data = false;
-    }
-
-    if (!disconnect_sink_bin_from_source_bin(source_bin, local_video_bin,
-                                             src_local_tee_pad,
-                                             "local_video_src")) {
-        exit(1);
-    }
-    src_local_tee_pad = nullptr;
 }
 
 bool RtmpStreamer::disconnect_sink_bin_from_source_bin(
@@ -547,71 +588,6 @@ bool RtmpStreamer::connect_sink_bin_to_source_bin(
     return true;
 }
 
-void RtmpStreamer::debug_info() {
-    const char *possible_states[5] = {"Void Pending", "Null", "Ready", "Paused",
-                                      "Playing"};
-    gst_println(
-        "\n----------------- START DEBUG INFO "
-        "-----------------------\n");
-    gst_println("pipeline state: %s (pending state: %s)\n",
-                possible_states[pipeline->current_state],
-                possible_states[pipeline->pending_state]);
-    gchar *name;
-    GST_OBJECT_LOCK(pipeline);
-    GList *pipeline_children = GST_BIN(pipeline)->children;
-
-    while (pipeline_children) {
-        GstBin *bin = GST_BIN(pipeline_children->data);
-        gst_println("###### BIN: %s ######", gst_pad_get_name(bin));
-        gst_println("bin state: %s (pending state: %s)\n",
-                    possible_states[GST_ELEMENT(pipeline_children->data)
-                                        ->current_state],
-                    possible_states[GST_ELEMENT(pipeline_children->data)
-                                        ->pending_state]);
-
-        GList *pads = GST_ELEMENT(pipeline_children->data)->pads;
-        gst_println("--- Bin Pads ---");
-        while (pads) {
-            GstPad *pad = GST_PAD(pads->data);
-            name = gst_pad_get_name(pad);
-            gst_println("bin pad: %s (is linked: %s)", name,
-                        gst_pad_is_linked(pad) ? "true" : "false");
-            g_free(name);
-            pads = pads->next;
-        }
-
-        gst_println("\n--- Elements ---");
-        GList *elements = bin->children;
-        while (elements) {
-            GstElement *element = GST_ELEMENT(elements->data);
-            name = gst_element_get_name(element);
-            gst_println("element: %s", name);
-            g_free(name);
-            gst_println("- element state: %s (pending state: %s)",
-                        possible_states[element->current_state],
-                        possible_states[element->pending_state]);
-
-            GList *pads = element->pads;
-            gst_println("element pads:");
-            while (pads) {
-                GstPad *pad = GST_PAD(pads->data);
-                name = gst_pad_get_name(pad);
-                gst_println("- element pad: %s (is linked: %s)", name,
-                            gst_pad_is_linked(pad) ? "true" : "false");
-                g_free(name);
-
-                pads = pads->next;
-            }
-            elements = elements->next;
-            gst_print("\n");
-        }
-        pipeline_children = pipeline_children->next;
-        gst_print("\n");
-    }
-    GST_OBJECT_UNLOCK(pipeline);
-    gst_println("----------------- END DEBUG INFO -----------------------\n");
-}
-
 bool RtmpStreamer::check_error() const {
     GstMessage *msg =
         gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE, GST_MESSAGE_ERROR);
@@ -659,27 +635,36 @@ void RtmpStreamer::cb_enough_data(GstAppSrc *appsrc, gpointer user_data) {
     *want_data = false;
 }
 
-void RtmpStreamer::async_streamer_control_unit() {
-    std::string command;
-    std::getline(std::cin, command);
+bool RtmpStreamer::connect_appsrc_signal_handler() {
+    if (!appsrc) {
+        return false;
+    }
 
-    do {
-        if (std::strcmp(command.c_str(), "start_stream") == 0) {
-            start_stream();
-        } else if (std::strcmp(command.c_str(), "stop_stream") == 0) {
-            stop_stream();
-        } else if (std::strcmp(command.c_str(), "stop_rtmp_stream") == 0) {
-            stop_rtmp_stream();
-        } else if (std::strcmp(command.c_str(), "stop_local_stream") == 0) {
-            stop_local_stream();
-        } else if (std::strcmp(command.c_str(), "start_rtmp_stream") == 0) {
-            start_rtmp_stream();
-        } else if (std::strcmp(command.c_str(), "start_local_stream") == 0) {
-            start_local_stream();
-        } else if (std::strcmp(command.c_str(), "quit") == 0) {
-            break;
-        } else {
-            gst_printerr("\nInvalid command.\n");
-        }
-    } while (std::getline(std::cin, command));
+    if (appsrc_need_data_id == 0) {
+        appsrc_need_data_id = g_signal_connect(
+            appsrc, "need-data", G_CALLBACK(cb_need_data), &want_data);
+    }
+    if (appsrc_enough_data_id == 0) {
+        appsrc_enough_data_id = g_signal_connect(
+            appsrc, "enough-data", G_CALLBACK(cb_enough_data), &want_data);
+    }
+    return appsrc_need_data_id != 0 && appsrc_enough_data_id != 0;
+}
+
+bool RtmpStreamer::disconnect_appsrc_signal_handler() {
+    if (!appsrc) {
+        return false;
+    }
+
+    if (appsrc_need_data_id != 0) {
+        g_signal_handler_disconnect(appsrc, appsrc_need_data_id);
+        appsrc_need_data_id = 0;
+    }
+    if (appsrc_enough_data_id != 0) {
+        g_signal_handler_disconnect(appsrc, appsrc_enough_data_id);
+        appsrc_enough_data_id = 0;
+    }
+    want_data = false;
+
+    return true;
 }

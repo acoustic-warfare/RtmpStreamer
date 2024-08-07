@@ -4,7 +4,7 @@ project(
   'cython',
   version: '0.1.0',
   meson_version: '>= 1.1.0',
-  default_options: ['buildtype=release', 'cpp_std=c++17'],
+  default_options: ['buildtype=debug', 'cpp_std=c++17'],
 )
 
 include_dirs = [include_directories('include')]

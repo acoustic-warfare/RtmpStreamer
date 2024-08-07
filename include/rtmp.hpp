@@ -214,6 +214,24 @@ class RtmpStreamer {
     bool send_frame_to_appsrc(void *data, size_t size);
 
     /**
+     * @brief Connects the signal handlers for appsrc's need-data and
+     * enough-data signals.
+     *
+     * @return True if the signal handlers are successfully connected, false
+     * otherwise.
+     */
+    bool connect_appsrc_signal_handler();
+
+    /**
+     * @brief Disconnects the signal handlers for appsrc's need-data and
+     * enough-data signals.
+     *
+     * @return True if the signal handlers are successfully disconnected, false
+     * otherwise.
+     */
+    bool disconnect_appsrc_signal_handler();
+
+    /**
      * @brief Checks for errors in the streaming process.
      *
      * NOTE: Should be run async with the program.
