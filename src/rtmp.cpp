@@ -402,10 +402,10 @@ void RtmpStreamer::stop_local_stream() {
 }
 
 bool RtmpStreamer::disconnect_sink_bin_from_source_bin(
-    GstElement *source_bin, GstElement *sink_bin, GstPad *tee_pad,
-    const char *tee_ghost_pad_src_name) {
+    GstElement *source_bin, GstElement *sink_bin, GstPad *request_pad,
+    const char *tee_ghost_pad_name) {
     GstPad *ghost_pad =
-        gst_element_get_static_pad(source_bin, tee_ghost_pad_src_name);
+        gst_element_get_static_pad(source_bin, tee_ghost_pad_name);
     GstElement *tee = gst_bin_get_by_name(GST_BIN(source_bin), "tee");
     if (!source_bin) {
         g_printerr("Invalid bin\n");
@@ -415,7 +415,7 @@ bool RtmpStreamer::disconnect_sink_bin_from_source_bin(
         g_printerr("Invalid tee element\n");
         return false;
     }
-    if (!tee_pad) {
+    if (!request_pad) {
         g_printerr("Invalid tee pad\n");
         return false;
     }
@@ -424,14 +424,11 @@ bool RtmpStreamer::disconnect_sink_bin_from_source_bin(
         return false;
     }
 
-    if (!source_bin || !tee || !tee_pad || !ghost_pad) {
+    if (!source_bin || !tee || !request_pad || !ghost_pad) {
         g_printerr("Invalid bin, tee, tee pad, or ghost pad\n");
         return false;
     }
     std::lock_guard<std::mutex> guard(handling_pipeline);
-
-    // Set elements to NULL state
-    // gst_element_set_state(pipeline, GST_STATE_NULL);
 
     // Lock the state of the elements before modifying the pipeline
     if (!gst_element_set_locked_state(GST_ELEMENT(pipeline), TRUE)) {
@@ -451,16 +448,16 @@ bool RtmpStreamer::disconnect_sink_bin_from_source_bin(
     gst_object_unref(ghost_pad);
 
     // Unlink the tee pad from its peer
-    peer_pad = gst_pad_get_peer(tee_pad);
+    peer_pad = gst_pad_get_peer(request_pad);
     if (peer_pad) {
-        gst_pad_unlink(tee_pad, peer_pad);
+        gst_pad_unlink(request_pad, peer_pad);
         gst_object_unref(peer_pad);
     }
 
     // Release the request pad from the tee element
-    gst_element_release_request_pad(tee, tee_pad);
+    gst_element_release_request_pad(tee, request_pad);
 
-    gst_object_unref(tee_pad);
+    gst_object_unref(request_pad);
 
     gchar *name = gst_element_get_name(sink_bin);
     sink_bin = gst_bin_get_by_name(GST_BIN(pipeline), name);
@@ -473,9 +470,6 @@ bool RtmpStreamer::disconnect_sink_bin_from_source_bin(
         gst_printerr("unable to unlock locked pipeline state\n");
         return false;
     }
-
-    // Set everyting but the disconnected Bin to PLAYING state
-    // gst_element_set_state(pipeline, GST_STATE_PLAYING);
 
     // Clean up
     gst_object_unref(tee);
