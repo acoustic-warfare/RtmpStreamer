@@ -15,7 +15,7 @@ cdef class PyRtmpStreamer:
     cdef unsigned int width
     cdef unsigned int height
 
-    def __cinit__(self, width: int, height: int, rtmp_streaming_addr="rtmp://ome.waraps.org/app/unnamed"):
+    def __cinit__(self, width: int, height: int, rtmp_streaming_addr="rtmp://ome.waraps.org/app/name-your-stream"):
         self.width = width
         self.height = height
         
