@@ -21,7 +21,7 @@ RtmpStreamer::RtmpStreamer()
       connected_bins_to_source(0),
       appsrc_need_data_id(0),
       appsrc_enough_data_id(0),
-      rtmp_streaming_addr("rtmp://ome.waraps.org/app/unnamed") {
+      rtmp_streaming_addr("rtmp://ome.waraps.org/app/name-your-stream") {
     initialize_streamer();
 }
 
@@ -48,23 +48,30 @@ RtmpStreamer::~RtmpStreamer() {
         gst_object_unref(local_video_bin);
         local_video_bin = nullptr;
     }
+    if (local_video_bin_name) {
+        g_free(local_video_bin_name);
+        local_video_bin_name = nullptr;
+    }
+    if (rtmp_bin_name) {
+        g_free(rtmp_bin_name);
+        rtmp_bin_name = nullptr;
+    }
+    if (source_bin_name) {
+        g_free(source_bin_name);
+        source_bin_name = nullptr;
+    }
 }
 
 void RtmpStreamer::start_stream() {
     connect_appsrc_signal_handler();
     start_rtmp_stream();
     start_local_stream();
-    gst_element_set_state(pipeline, GST_STATE_PLAYING);
-    bus = gst_element_get_bus(pipeline);
 }
 
 void RtmpStreamer::stop_stream() {
     disconnect_appsrc_signal_handler();
     stop_rtmp_stream();
     stop_local_stream();
-    gst_element_set_state(pipeline, GST_STATE_NULL);
-    gst_object_unref(bus);
-    bus = nullptr;
 }
 
 void RtmpStreamer::start_rtmp_stream() {
@@ -76,12 +83,14 @@ void RtmpStreamer::start_rtmp_stream() {
     }
     connect_appsrc_signal_handler();
 
-    if (!connect_sink_bin_to_source_bin(source_bin, rtmp_bin, &src_rtmp_tee_pad,
+    if (!connect_sink_bin_to_source_bin(source_bin, &rtmp_bin, &src_rtmp_tee_pad,
                                         "tee", "tee_rtmp_src")) {
         exit(1);
     }
+
     if (++connected_bins_to_source == 1) {
         gst_element_set_state(pipeline, GST_STATE_PLAYING);
+        bus = gst_element_get_bus(pipeline);
     }
 }
 
@@ -95,10 +104,12 @@ void RtmpStreamer::stop_rtmp_stream() {
     if (--connected_bins_to_source == 0) {
         gst_element_set_state(pipeline, GST_STATE_NULL);
         disconnect_appsrc_signal_handler();
+        gst_object_unref(bus);
+        bus = nullptr;
     }
 
     if (!disconnect_sink_bin_from_source_bin(
-            source_bin, rtmp_bin, src_rtmp_tee_pad, "tee_rtmp_src")) {
+            source_bin, &rtmp_bin, src_rtmp_tee_pad, rtmp_bin_name, "tee_rtmp_src")) {
         exit(1);
     }
     src_rtmp_tee_pad = nullptr;
@@ -114,7 +125,7 @@ void RtmpStreamer::start_local_stream() {
     }
     connect_appsrc_signal_handler();
 
-    if (!connect_sink_bin_to_source_bin(source_bin, local_video_bin,
+    if (!connect_sink_bin_to_source_bin(source_bin, &local_video_bin,
                                         &src_local_tee_pad, "tee",
                                         "local_video_src")) {
         exit(1);
@@ -122,6 +133,7 @@ void RtmpStreamer::start_local_stream() {
 
     if (++connected_bins_to_source == 1) {
         gst_element_set_state(pipeline, GST_STATE_PLAYING);
+        bus = gst_element_get_bus(pipeline);
     }
 }
 
@@ -137,19 +149,21 @@ void RtmpStreamer::stop_local_stream() {
     if (connected_bins_to_source == 0) {
         gst_element_set_state(pipeline, GST_STATE_NULL);
         disconnect_appsrc_signal_handler();
+        gst_object_unref(bus);
+        bus = nullptr;
     }
 
-    if (!disconnect_sink_bin_from_source_bin(source_bin, local_video_bin,
+    if (!disconnect_sink_bin_from_source_bin(source_bin, &local_video_bin,
                                              src_local_tee_pad,
-                                             "local_video_src")) {
+                                             local_video_bin_name, "local_video_src")) {
+        gst_print("ahahah");
         exit(1);
     }
-    src_local_tee_pad = nullptr;
 }
 
 bool RtmpStreamer::send_frame(unsigned char *frame, size_t size) {
     if (size <= 0) {
-        g_printerr("Captured frame is empty.\n");
+        gst_printerr("Captured frame is empty.\n");
         return FALSE;
     }
 
@@ -157,7 +171,6 @@ bool RtmpStreamer::send_frame(unsigned char *frame, size_t size) {
 
     want_data_muxex.lock();
     if (!want_data) {
-        // gst_printerr("appsrc does not require data right now.\n");
         want_data_muxex.unlock();
         return FALSE;
     }
@@ -168,7 +181,7 @@ bool RtmpStreamer::send_frame(unsigned char *frame, size_t size) {
 
 bool RtmpStreamer::send_frame(cv::Mat &frame) {
     if (frame.empty()) {
-        g_printerr("Captured frame is empty.\n");
+        gst_printerr("Captured frame is empty.\n");
         return FALSE;
     }
 
@@ -176,7 +189,6 @@ bool RtmpStreamer::send_frame(cv::Mat &frame) {
 
     want_data_muxex.lock();
     if (!want_data) {
-        // gst_printerr("appsrc does not require data right now.\n");
         want_data_muxex.unlock();
         return FALSE;
     }
@@ -189,7 +201,7 @@ bool RtmpStreamer::send_frame(cv::Mat &frame) {
     } else if (frame.channels() == 3) {
         cv::cvtColor(frame, temp_frame, cv::COLOR_BGR2RGB);
     } else {
-        g_printerr("Captured frame is not in a supported format.\n");
+        gst_printerr("Captured frame is not in a supported format.\n");
         return FALSE;
     }
 
@@ -410,14 +422,14 @@ bool RtmpStreamer::send_frame_to_appsrc(void *data, size_t size) {
     GstStateChangeReturn ret;
 
     if (!element) {
-        g_printerr("Element is NULL\n");
+        gst_printerr("Element is NULL\n");
         return;
     }
 
     // Get the parent element
     parent = GST_ELEMENT(gst_element_get_parent(element));
     if (!parent) {
-        g_printerr("Element has no parent\n");
+        gst_printerr("Element has no parent\n");
         return;
     }
 
@@ -425,7 +437,7 @@ bool RtmpStreamer::send_frame_to_appsrc(void *data, size_t size) {
     ret = gst_element_get_state(parent, &parent_state, &parent_pending,
                                 GST_CLOCK_TIME_NONE);
     if (ret != GST_STATE_CHANGE_SUCCESS) {
-        g_printerr("Failed to get parent state\n");
+        gst_printerr("Failed to get parent state\n");
         gst_object_unref(parent);
         return;
     }
@@ -433,7 +445,7 @@ bool RtmpStreamer::send_frame_to_appsrc(void *data, size_t size) {
     // Set the state of the element to the parent state
     ret = gst_element_set_state(element, parent_state);
     if (ret != GST_STATE_CHANGE_SUCCESS) {
-        g_printerr("Failed to set element state\n");
+        gst_printerr("Failed to set element state\n");
     } else {
         g_print("Element state set to match parent state: %d\n", parent_state);
     }
@@ -443,30 +455,23 @@ bool RtmpStreamer::send_frame_to_appsrc(void *data, size_t size) {
 }
 
 bool RtmpStreamer::disconnect_sink_bin_from_source_bin(
-    GstElement *source_bin, GstElement *sink_bin, GstPad *request_pad,
-    const char *tee_ghost_pad_name) {
-    GstPad *ghost_pad =
-        gst_element_get_static_pad(source_bin, tee_ghost_pad_name);
-    GstElement *tee = gst_bin_get_by_name(GST_BIN(source_bin), "tee");
-    if (!source_bin) {
-        g_printerr("Invalid bin\n");
+    GstElement *source_bin, GstElement **sink_bin, GstPad *request_pad,
+    const char *sink_bin_name, const char *tee_ghost_pad_name) {
+    if (!sink_bin) {
+        gst_printerr("sink_bin null pointer\n");
         return false;
-    }
-    if (!tee) {
-        g_printerr("Invalid tee element\n");
-        return false;
-    }
-    if (!request_pad) {
-        g_printerr("Invalid tee pad\n");
-        return false;
-    }
-    if (!ghost_pad) {
-        g_printerr("Invalid source ghost pad\n");
+    } else if (!source_bin || !request_pad ||
+               !tee_ghost_pad_name || !sink_bin_name) {
+        gst_printerr("Invalid arguments\n");
         return false;
     }
 
-    if (!source_bin || !tee || !request_pad || !ghost_pad) {
-        g_printerr("Invalid bin, tee, tee pad, or ghost pad\n");
+    GstPad *ghost_pad =
+        gst_element_get_static_pad(source_bin, tee_ghost_pad_name);
+    GstElement *tee = gst_bin_get_by_name(GST_BIN(source_bin), "tee");
+
+    if (!tee || !request_pad || !ghost_pad) {
+        gst_printerr("tee, tee pad, or ghost pad\n");
         return false;
     }
     std::lock_guard<std::mutex> guard(handling_pipeline);
@@ -500,11 +505,9 @@ bool RtmpStreamer::disconnect_sink_bin_from_source_bin(
 
     gst_object_unref(request_pad);
 
-    gchar *name = gst_element_get_name(sink_bin);
-    sink_bin = gst_bin_get_by_name(GST_BIN(pipeline), name);
-    g_free(name);
+    *sink_bin = gst_bin_get_by_name(GST_BIN(pipeline), sink_bin_name);
 
-    gst_bin_remove(GST_BIN(pipeline), sink_bin);
+    gst_bin_remove(GST_BIN(pipeline), *sink_bin);
 
     // Unlock the mutex after making changes
     if (!gst_element_set_locked_state(GST_ELEMENT(pipeline), FALSE)) {
@@ -519,7 +522,7 @@ bool RtmpStreamer::disconnect_sink_bin_from_source_bin(
 }
 
 bool RtmpStreamer::connect_sink_bin_to_source_bin(
-    GstElement *source_bin, GstElement *sink_bin, GstPad **request_pad,
+    GstElement *source_bin, GstElement **sink_bin, GstPad **request_pad,
     const char *tee_element_name, const char *tee_ghost_pad_name) {
     if (!source_bin || !sink_bin) {
         gst_printerr("Invalid source- or sink-bin, \n");
@@ -533,7 +536,7 @@ bool RtmpStreamer::connect_sink_bin_to_source_bin(
         return false;
     }
 
-    if (!gst_bin_add(GST_BIN(pipeline), sink_bin)) {
+    if (!gst_bin_add(GST_BIN(pipeline), *sink_bin)) {
         gst_printerr("error, unable to add sink bin to pipeline!!\n");
         exit(1);
     }
@@ -558,7 +561,7 @@ bool RtmpStreamer::connect_sink_bin_to_source_bin(
     // Link ghost pad of source_bin to sink_bin
     GstPad *src_ghost_pad =
         gst_element_get_static_pad(source_bin, tee_ghost_pad_name);
-    GstPad *sink_ghost_pad = gst_element_get_static_pad(sink_bin, "sink");
+    GstPad *sink_ghost_pad = gst_element_get_static_pad(*sink_bin, "sink");
     GstPadLinkReturn link_ok = gst_pad_link(src_ghost_pad, sink_ghost_pad);
     if (link_ok != GST_PAD_LINK_OK) {
         gst_printerr(
@@ -578,7 +581,9 @@ bool RtmpStreamer::connect_sink_bin_to_source_bin(
         return false;
     }
 
-    gst_element_set_state(sink_bin, GST_STATE_PLAYING);
+    gst_element_set_state(*sink_bin, GST_STATE_PLAYING);
+
+    *sink_bin = nullptr;
 
     // Unref objects
     gst_object_unref(src_ghost_pad);
@@ -598,10 +603,10 @@ bool RtmpStreamer::check_error() const {
         switch (GST_MESSAGE_TYPE(msg)) {
             case GST_MESSAGE_ERROR:
                 gst_message_parse_error(msg, &err, &debug_info);
-                g_printerr("Error received from element %s: %s\n",
-                           GST_OBJECT_NAME(msg->src), err->message);
-                g_printerr("Debugging information: %s\n",
-                           debug_info ? debug_info : "none");
+                gst_printerr("Error received from element %s: %s\n",
+                             GST_OBJECT_NAME(msg->src), err->message);
+                gst_printerr("Debugging information: %s\n",
+                             debug_info ? debug_info : "none");
                 g_clear_error(&err);
                 g_free(debug_info);
                 return true;

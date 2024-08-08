@@ -8,21 +8,25 @@
 
 class RtmpStreamer {
    public:
+
     /**
      * @brief Default constructor for the RtmpStreamer class.
      *
      * The `RtmpStreamer` constructor initializes the streamer with a default
      * video input resolution of 1024x1024. Default RTMP server is
-     * 'rtmp://ome.waraps.org/app/unnamed'.
+     * 'rtmp://ome.waraps.org/app/name-your-stream'. 
      */
     RtmpStreamer();
 
     /**
      * @brief Constructs an RtmpStreamer with specified width and height.
      *
-     * @param width The width of the input frame.
-     * @param height The height of the input frame.
+     * @param width The pixel width of each input frame.
+     * @param height The pixel height of each input frame.
      * @param rtmp_streaming_addr The address of the RTMP server to stream to.
+     *
+     * NOTE: The last part of the streaming address becomes the name of stream
+     *
      */
     RtmpStreamer(uint width, uint height, const char *rtmp_streaming_addr);
 
@@ -68,14 +72,14 @@ class RtmpStreamer {
     bool send_frame(unsigned char *frame, size_t size);
 
     /**
-     * @brief Starts the hole streaming pipeline.
+     * @brief Starts the whole streaming pipeline.
      *
      * Will start both the local stream and the stream to the RTMP server.
      */
     void start_stream();
 
     /**
-     * @brief Stops the hole streaming pipeline.
+     * @brief Stops the whole streaming pipeline.
      *
      * Will stop both the local stream and the stream to the RTMP server.
      */
@@ -183,7 +187,7 @@ class RtmpStreamer {
      * @return true if the connection was successful, false otherwise.
      */
     bool connect_sink_bin_to_source_bin(GstElement *source_bin,
-                                        GstElement *sink_bin,
+                                        GstElement **sink_bin,
                                         GstPad **request_pad,
                                         const char *tee_element_name,
                                         const char *tee_ghost_pad_name);
@@ -193,15 +197,19 @@ class RtmpStreamer {
      * pipeline.
      *
      * @param source_bin The source bin from which to disconnect.
-     * @param sink_bin The sink bin to disconnect.
+     * @param sink_bin Location to store the removed sink-bin
      * @param request_pad The pad from the tee element to be disconnected.
+     * @param sink_bin_name The name of the sink bin to remove
      * @param tee_ghost_pad_name The name of the ghost pad in the source
      * bin.
      * @return True if the disconnection is successful, otherwise false.
+     *
+     * @side-effect Transfers ownership of removed sink-bin to 
      */
     bool disconnect_sink_bin_from_source_bin(GstElement *source_bin,
-                                             GstElement *sink_bin,
+                                             GstElement **sink_bin,
                                              GstPad *request_pad,
+                                             const char *sink_bin_name,
                                              const char *tee_ghost_pad_name);
 
     /**
