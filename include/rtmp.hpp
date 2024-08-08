@@ -177,7 +177,9 @@ class RtmpStreamer {
      * NOTE: Source element must contain a tee element.
      *
      * @param source_bin The source bin element to connect from.
-     * @param sink_bin The sink bin element to connect to.
+     * @param sink_bin The sink bin element to connect to. 
+     * NOTE: Transfers ownership of sink_bin to the pipeline
+     *
      * @param request_pad A place to store the requested pad from the tee
      * element.
      * @param tee_element_name The name of the tee element within the source
