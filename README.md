@@ -21,7 +21,7 @@ To build and run the DynRT project, you need to have the following dependencies 
 
 ## Python Packages
 - **Cython**: Version 3.0.0 or higher
-- **NumPy**: Version 1.21.0 or higher
+- **NumPy**: Version 1.2X.0
 
 ## How to Install Dependencies
 ### Using Package Managers
