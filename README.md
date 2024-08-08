@@ -88,10 +88,9 @@ Before the library can be used by other executables and libraries, it must be ex
 *C++* usecase with comments:
 ```c++
 #include <future>
-#include <rtmp.hpp>
 #include <opencv2/core/mat.hpp>
 #include <opencv2/opencv.hpp>
-
+#include <rtmp.hpp>
 
 #define SCREEN_WIDTH 1920
 #define SCREEN_HEIGHT 1080
@@ -108,27 +107,34 @@ int main(int argc, char *argv[]) {
     cv::Mat frame(SCREEN_HEIGHT, SCREEN_WIDTH, CV_8UC1);
     cv::applyColorMap(frame, frame, cv::COLORMAP_JET);
 
-    // This control unit takes input from the terminal and controls the state of the streamer
+    // This control unit takes input from the terminal and controls the state of
+    // the streamer
     auto control_unit =
         std::async(std::launch::async,
                    &RtmpStreamer::async_streamer_control_unit, &streamer);
 
-    // do some color manipulation on the frame
-    frame.forEach<Pixel>([](Pixel &pix, const int *position) {
-        pix.x = 255;
-        pix.y = 0;
-        pix.z = 0;
-    });
+    // Used for color manipulation
+    static int count = 0;
 
     while (true) {
-        // Pass the frame on to the streamer pipeline to be shown locally and/or sent up to waraps.
-        // Streamer does not take ownership of the frame and does not change anything in the frame.
+        // do some color manipulation on the frame
+        frame.forEach<Pixel>([](Pixel &pix, const int *position) {
+            pix.x = count < 10 ? 255 : 0;
+            pix.y = 10 <= count && count < 20 ? 255 : 0;
+            pix.z = count >= 20 ? 255 : 0;
+        });
+
+        // Pass the frame on to the streamer pipeline to be shown locally and/or
+        // sent up to RTMP server. Streamer does not take ownership of the frame
+        // and does not change anything in the frame.
         streamer.send_frame(frame);
+
+        count = (count + 1) % 30;
 
         // Only returns when user has typed "quit" in the terminal
         if (control_unit.wait_for(std::chrono::milliseconds(10)) ==
             std::future_status::ready) {
-            break;
+            return 0;
         }
     }
 
