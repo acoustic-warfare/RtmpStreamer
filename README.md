@@ -25,8 +25,7 @@ To build and run the DynRT project, you need to have the following dependencies 
 
 ## How to Install Dependencies
 ### Using Package Managers
-#### Ubuntu
-**(NOTE: depending on ubuntu version, meson and ninja might be to old and need to be installed )**
+### Ubuntu
 ```bash
 sudo apt-get update
 sudo apt-get install -y g++ libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav gstreamer1.0-tools gstreamer1.0-x gstreamer1.0-alsa gstreamer1.0-gl gstreamer1.0-gtk3 gstreamer1.0-qt5 gstreamer1.0-pulseaudio libopencv-dev libfmt-dev python3-dev python3-pip
