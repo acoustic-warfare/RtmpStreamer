@@ -2,7 +2,7 @@ project(
   'Dynamic Rtmp Streamer',
   'cpp',
   'cython',
-  version: '0.1.0',
+  version: '1.0.0',
   meson_version: '>= 1.1.0',
   default_options: ['buildtype=debug', 'cpp_std=c++17'],
 )
