@@ -24,23 +24,28 @@ int main(int argc, char *argv[]) {
         std::async(std::launch::async,
                    &RtmpStreamer::async_streamer_control_unit, &streamer);
 
-    // do some color manipulation on the frame
-    frame.forEach<Pixel>([](Pixel &pix, const int *position) {
-        pix.x = 255;
-        pix.y = 0;
-        pix.z = 0;
-    });
+    // Used for color manipulation
+    static int count = 0;
 
     while (true) {
+        // do some color manipulation on the frame
+        frame.forEach<Pixel>([](Pixel &pix, const int *position) {
+            pix.x = count < 10 ? 255 : 0;
+            pix.y = 10 <= count && count < 20 ? 255 : 0;
+            pix.z = count >= 20 ? 255 : 0;
+        });
+
         // Pass the frame on to the streamer pipeline to be shown locally and/or
-        // sent up to waraps. Streamer does not take ownership of the frame and
-        // does not change anything in the frame.
+        // sent up to RTMP server. Streamer does not take ownership of the frame
+        // and does not change anything in the frame.
         streamer.send_frame(frame);
+
+        count = (count + 1) % 30;
 
         // Only returns when user has typed "quit" in the terminal
         if (control_unit.wait_for(std::chrono::milliseconds(10)) ==
             std::future_status::ready) {
-            break;
+            return 0;
         }
     }
 
